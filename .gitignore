@@ -1,0 +1,4 @@
+# Yerel VR test sertifikasi ve ozel anahtar: asla yayinlanmaz
+tools/vr-sertifika/
+*.pem
+*.key

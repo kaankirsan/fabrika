@@ -77,16 +77,48 @@ controls.maxDistance = 280;
 controls.screenSpacePanning = false; // zemin düzleminde kaydır
 controls.update();
 
+// Dikey ekranda (telefon) 152 m'lik salon yandan bakışta ince bir şerit kalıyor:
+// salonu boylamasına, batı ucundan yukarıdan gör.
+const GENEL_DIKEY = { poz: new THREE.Vector3(-165, 170, 3), hedef: new THREE.Vector3(-28, 0, 2) };
+const SAHA_DIKEY = { poz: new THREE.Vector3(76, 165, 46), hedef: new THREE.Vector3(80, 0, -6) };
+const dikey = () => window.innerWidth < window.innerHeight * 0.9;
+const genelGorunum = () => (dikey() ? GENEL_DIKEY : GENEL);
+const sahaGorunum = () => (dikey() ? SAHA_DIKEY : SAHA_GORUNUM);
+
 // Görüntü merkezini sol liste (~250 px) ile sağ panel (~370 px, açıksa)
 // arasındaki serbest alanın ortasına kaydır: makine panelin arkasında kalmasın.
+// Dar ekranda serbest alan DOM'dan ölçülür (üstte şerit + yatay liste, panel altta ya da sağda).
+let serbest = { fw: 1, fh: 1 };
 function gorunumAyarla() {
   const W = window.innerWidth, H = window.innerHeight;
   camera.aspect = W / H;
-  const genis = W > 900;
-  const kay = genis ? Math.round(((!$('panel').hidden ? 370 : 0) - 250) / 2) : 0;
-  if (kay) camera.setViewOffset(W, H, kay, 0, W, H); else camera.clearViewOffset();
+  let kx = 0, ky = 0;
+  if (W > 900) {
+    kx = Math.round(((!$('panel').hidden ? 370 : 0) - 250) / 2);
+    serbest = { fw: 1, fh: 1 };
+  } else {
+    document.documentElement.style.setProperty('--ust-h', $('ust').offsetHeight + 'px');
+    let L = 0, R = W, T = Math.max($('ust').getBoundingClientRect().bottom, $('liste').getBoundingClientRect().bottom), B = H;
+    if (!$('panel').hidden) {
+      const p = $('panel').getBoundingClientRect();
+      if (p.left > W * 0.3) R = p.left - 4; else B = p.top - 4;
+    }
+    kx = Math.round(W / 2 - (L + R) / 2);
+    ky = Math.round(H / 2 - (T + B) / 2);
+    serbest = { fw: Math.max(0.2, (R - L) / W), fh: Math.max(0.2, (B - T) / H) };
+  }
+  if (kx || ky) camera.setViewOffset(W, H, kx, ky, W, H); else camera.clearViewOffset();
   camera.updateProjectionMatrix();
   renderer.setSize(W, H);
+}
+
+// Masaüstünde makine yakın planı serbest alanda yatayda ≈0.45·2d, dikeyde ≈0.385·2d genişlik görür;
+// dar ekranda aynı doluluk için kamerayı bu oranla geri çek.
+function darCarpani() {
+  if (window.innerWidth > 900) return 1;
+  const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const k = Math.max(0.385 / (t * serbest.fh), 0.45 / (t * camera.aspect * serbest.fw));
+  return THREE.MathUtils.clamp(k, 1, 2.8);
 }
 window.addEventListener('resize', gorunumAyarla);
 
@@ -340,13 +372,17 @@ function sec(x, { anlik = false } = {}) {
   document.querySelectorAll('.kart').forEach((k, i) => k.classList.toggle('secili', makineler[i] === x));
   if (!x) {
     $('panel').hidden = true; gorunumAyarla();
-    if (anlik) { camera.position.copy(GENEL.poz); controls.target.copy(GENEL.hedef); } else uc(GENEL.poz, GENEL.hedef);
+    const G = genelGorunum();
+    if (anlik) { camera.position.copy(G.poz); controls.target.copy(G.hedef); } else uc(G.poz, G.hedef);
     return;
   }
-  const k = makineKamerasi(x);
-  if (anlik) { camera.position.copy(k.poz); controls.target.copy(k.hedef); } else uc(k.poz, k.hedef);
+  // panel önce açılsın: dar ekranda yakın plan mesafesi panelin bıraktığı alana göre hesaplanır
   paneliKur(x);
   gorunumAyarla();
+  const k = makineKamerasi(x);
+  const f = darCarpani();
+  if (f > 1) k.poz.sub(k.hedef).multiplyScalar(f).add(k.hedef);
+  if (anlik) { camera.position.copy(k.poz); controls.target.copy(k.hedef); } else uc(k.poz, k.hedef);
 }
 
 function listeKur() {
@@ -597,7 +633,7 @@ function yuru(dt) {
 
 // ------------------------------------------------------------------ üst şerit düğmeleri
 $('btn-genel').onclick = () => { if (!vr?.aktif()) sec(null); };
-$('btn-saha').onclick = () => { sec(null); uc(SAHA_GORUNUM.poz, SAHA_GORUNUM.hedef); };
+$('btn-saha').onclick = () => { sec(null); const S = sahaGorunum(); uc(S.poz, S.hedef); };
 $('chk-etiket').onchange = (e) => makineler.forEach((x) => (x.etiket.visible = e.target.checked));
 $('chk-golge').onchange = (e) => { gunes.castShadow = e.target.checked; };
 
@@ -698,7 +734,7 @@ vr = vrKur({
 });
 const ilk = URLP.get('m');
 const ilkX = ilk && makineler.find((x) => x.m.id === ilk || x.yer.id === ilk);
-if (ilkX) sec(ilkX, { anlik: true });
+sec(ilkX || null, { anlik: true }); // null → ekran yönüne uygun genel bakış
 renderer.setAnimationLoop(dongu);
 $('yukleniyor').classList.add('bitti');
 window.__fabrika = { makineler, sec, hazir: true, camera, controls, renderer, golgesiz, vr, sabitIst };

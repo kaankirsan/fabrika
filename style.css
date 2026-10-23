@@ -103,10 +103,20 @@ body.arayuzsuz #ust, body.arayuzsuz #liste, body.arayuzsuz #panel, body.arayuzsu
 
 /* ---------------- dar ekran */
 @media (max-width: 900px) {
+  #ust { gap: 8px; padding: 6px 10px; }
   #ust .alt, .anahtar { display: none; }
-  #liste { top: 54px; left: 0; right: 0; width: auto; flex-direction: row; overflow-x: auto; padding: 0 8px; max-height: none; }
+  .logo { font-size: 22px; }
+  .baslik { font-size: 12.5px; letter-spacing: 1.2px; line-height: 1.15; }
+  .dugme { padding: 6px 9px; font-size: 12.5px; white-space: nowrap; }
+  /* --ust-h: üst şeridin gerçek yüksekliği (main.js gorunumAyarla ölçer) */
+  #liste { top: calc(var(--ust-h, 46px) + 6px); left: 0; right: 0; width: auto; flex-direction: row; overflow-x: auto;
+    padding: 0 8px; max-height: none; scrollbar-width: none; }
   .kart { flex: none; padding: 6px 9px; }
   .kart .ad small { display: none; }
   #panel { top: auto; left: 8px; right: 8px; width: auto; height: 46vh; }
   #ipucu { display: none; }
+}
+/* yatay telefon: panel altta kalırsa sahneye yer kalmaz, sağa al */
+@media (max-width: 900px) and (orientation: landscape) {
+  #panel { top: calc(var(--ust-h, 46px) + 52px); bottom: 8px; left: auto; width: 46vw; height: auto; }
 }

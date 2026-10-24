@@ -1,11 +1,11 @@
 // js/machines/ebisiklet.js — Elektrikli Bisiklet Dönüşümü (kişisel proje): aşama aşama montaj.
 //
 // Fotoğraflardan (portföy personal-img-01/03/04/05/06/07/10, personal-video-01):
-//  v1 — kırmızı/gri donör MTB: arka göbek motoru + selenin arkasında taşıyıcıda siyah kutu pil,
-//       kontrolcü ve şarj cihazı yerde (img-03) → pil kadro üçgenine, koyu kırmızı üçgen kutuya
+//  v1 — kırmızı/gri donör MTB: arka göbek motoru + selenin arkasında taşıyıcıda siyah akü kutusu,
+//       kontrolcü ve şarj cihazı yerde (img-03) → akü kadro üçgenine, koyu kırmızı üçgen kutuya
 //       taşınır; gidonda krom far (img-07, img-01).
 //  v2 — parçalar yeni SİYAH kadroya aktarılır (img-04: eski bisiklet yanında), karbon desenli siyah
-//       üçgen pil kutusu + şarj soketi, turuncu şarj cihazı (img-10); son hâl: 500 W arka göbek
+//       üçgen akü kutusu + şarj soketi, turuncu şarj cihazı (img-10); son hâl: 500 W arka göbek
 //       motoru, siyah üçgen kutu, sarı-yeşil sele çantası, çift LED far, gidon ekranı (img-05/06).
 // İstasyon: bisiklet tamir sehpasında, arkada tezgâh. Operatör aşama değişince parçayı tezgâhtan
 // alıp takar (bisiklet-arası aktarımda bisikletleri iterek yer değiştirir). Test: arka teker
@@ -280,9 +280,9 @@ export function create(lib) {
   // ---------------------------------------------------------------- aşama durumu (animasyonsuz uygula)
   const ASAMA = {
     1: 'Donör bisiklet (kırmızı/gri)',
-    2: 'Arka göbek motoru 500 W + arka pil kutusu',
-    3: 'Pil kadro üçgeninde (kırmızı kutu)',
-    4: 'Siyah kadroya geçiş + siyah üçgen pil/BMS',
+    2: 'Arka göbek motoru 500 W + arka akü kutusu',
+    3: 'Akü kadro üçgeninde (kırmızı kutu)',
+    4: 'Siyah kadroya geçiş + siyah üçgen akü kutusu',
     5: 'Kontrolcü, gidon ekranı, çift far',
   };
   // hangi parça hangi aşamadan itibaren bisiklette
@@ -497,9 +497,10 @@ export function create(lib) {
   }
 
   // ---------------------------------------------------------------- test / pil modeli
-  // Pil 48 V 13 Ah (≈624 Wh) varsayıldı: 30 km/h'de yol gücü ≈ 410 W → ≈ 13.7 Wh/km → %100'de ≈ 45 km.
-  const PIL_WH = 624;
-  let test = false, gaz = 70, soc = 0.86, sarj = false, bmsHata = false, acil = false;
+  // Akü (Kaan'dan): 4 × 12 V 9 Ah jel akü seri → 48 V 9 Ah ≈ 432 Wh. Kurşun-asitte kullanılabilir ≈ %80
+  // (≈345 Wh): 20 km/h karışık sürüşte ≈ 7.8 Wh/km → ≈ 45 km; sürekli 30 km/h'de ≈ 13.7 Wh/km → ≈ 25 km.
+  const PIL_WH = 432, KULLANILIR = 0.8;
+  let test = false, gaz = 70, soc = 0.86, sarj = false, zayifBlok = false, acil = false;
   let hiz = 0, guc = 0, akim = 0, volt = 52, demo = true, demoT = 0;
   const yolGucu = (v) => 15 + 2.2 * v + 0.012 * v * v * v;   // v: km/h → W (düz yol, sürücü ~80 kg)
   const testOlur = () => !acil && (asama === 2 || asama === 3 || asama === 5) && !is && !isler.length && !adim && asama === hedefAsama;
@@ -527,15 +528,16 @@ export function create(lib) {
     isGuncelle(dt);
     if (test && !testOlur()) test = false;
 
-    // motor (standda yüksüz): gaz → hız; BMS hatası gücü sınırlar
-    const sinir = bmsHata ? 0.45 : 1;
+    // motor (standda yüksüz): gaz → hız; zayıf akü bloğu gerilimi düşürür → kontrolcü gücü kısar
+    const sinir = zayifBlok ? 0.45 : 1;
     const vHedef = test ? 32 * (gaz / 100) * sinir : 0;
     hiz = approach(hiz, vHedef, (test ? 9 : 14) * dt);
     guc = test ? 22 + 2.4 * hiz + gurultu(3) : 0;                 // yüksüz dönüş kaybı
     if (soc <= 0.02) { test = false; }
-    volt = 13 * (3.32 + 0.86 * soc) - (guc / 50) * 0.09;
+    // 4 blok jel akü: dinlenme ≈ 12.85 V/blok (dolu) … ≈ 11.8 V (kullanılabilir alt sınır); iç direnç ≈ 0.12 Ω
+    volt = 4 * (11.8 + 1.05 * soc) - (zayifBlok ? 1.6 : 0) - (guc / 48) * 0.12;
     akim = guc / volt;
-    if (test) soc = Math.max(0, soc - (guc * dt * 30) / (PIL_WH * 3600));   // ×30 hızlandırılmış
+    if (test) soc = Math.max(0, soc - (guc * dt * 30) / (PIL_WH * KULLANILIR * 3600));   // ×30 hızlandırılmış
     if (sarj) { soc = Math.min(1, soc + dt * 0.03); if (soc >= 1) sarj = false; }
     sarjLed.color.set(soc >= 0.999 ? 0x2ea043 : 0xff3b30); sarjLed.emissive.copy(sarjLed.color);
     sarjLed.emissiveIntensity = sarj || soc >= 0.999 ? 1.8 : 0.3;
@@ -581,13 +583,13 @@ export function create(lib) {
     }
   }
   const menzil = () => {
-    const v = hiz > 3 ? hiz : 30;
-    return (soc * PIL_WH * 0.95) / (yolGucu(v) / v);
+    const v = hiz > 3 ? hiz : 20;   // boşta: 20 km/h karışık sürüş
+    return (soc * PIL_WH * KULLANILIR) / (yolGucu(v) / v);
   };
   function durumBilgi() {
-    if (acil) return { metin: 'ACİL KESME · BMS AÇIK', seviye: 'alarm' };
+    if (acil) return { metin: 'ACİL KESME · AKÜ DEVRESİ AÇIK', seviye: 'alarm' };
     if (is || isler.length || adim || asama < hedefAsama) return { metin: `MONTAJ · AŞAMA ${Math.min(5, asama + 1)}: ${ASAMA[Math.min(5, asama + 1)]}`, seviye: 'calisiyor' };
-    if (test && bmsHata) return { metin: 'BMS: HÜCRE DENGESİZLİĞİ · GÜÇ SINIRLI', seviye: 'uyari' };
+    if (test && zayifBlok) return { metin: 'ZAYIF AKÜ BLOĞU · GERİLİM DÜŞÜK · GÜÇ SINIRLI', seviye: 'uyari' };
     if (test) return { metin: `TEST · ${fmt(hiz, 0)} km/h · ${fmt(guc, 0)} W`, seviye: 'calisiyor' };
     if (sarj) return { metin: `ŞARJ · %${fmt(soc * 100, 0)}`, seviye: 'calisiyor' };
     if (soc < 0.15) return { metin: 'PİL ZAYIF · ŞARJ GEREKLİ', seviye: 'uyari' };
@@ -612,7 +614,7 @@ export function create(lib) {
     ] },
     { tip: 'kaydirici', metin: 'Gaz', min: 0, max: 100, adim: 5, birim: '%', get: () => gaz, set: (v) => (gaz = v) },
     { tip: 'baslik', metin: 'Arıza / güvenlik' },
-    { tip: 'anahtar', metin: 'BMS: hücre dengesizliği (simülasyon)', get: () => bmsHata, set: (v) => (bmsHata = v) },
+    { tip: 'anahtar', metin: 'Zayıf akü bloğu (simülasyon)', get: () => zayifBlok, set: (v) => (zayifBlok = v) },
     { tip: 'butonlar', ogeler: [
       { metin: 'ACİL KESME', tur: 'acil', tik: () => { acil = true; test = false; sarj = false; } },
       { metin: 'Reset', tik: () => { acil = false; } },
@@ -622,25 +624,26 @@ export function create(lib) {
   return {
     id: 'ebisiklet',
     ad: 'Elektrikli Bisiklet Dönüşümü',
-    altBaslik: 'Kişisel · 500 W göbek motoru · BMS',
-    kisa: 'Kişisel projem: sıradan bir dağ bisikletini 500 W arka göbek motoru, kendi pil paketim ve BMS ile elektrikliye çevirdim (30 km/h, 45 km menzil). Önce kırmızı donör kadroda denedim, sonra parçaları siyah kadroya taşıyıp karbon desenli üçgen pil kutusu, gidon ekranı ve çift LED farla bitirdim. İstasyonda aşamaları seçip montajı ve standda motor testini izleyebilirsin.',
+    altBaslik: 'Kişisel · 500 W arka göbek motoru · 48 V jel akü',
+    kisa: 'Kişisel projem: sıradan bir dağ bisikletini 500 W arka göbek motoru ve 48 V jel akü paketiyle (4 × 12 V 9 Ah seri) elektrikliye çevirdim (30 km/h, 45 km menzil). Önce kırmızı donör kadroda denedim, sonra parçaları siyah kadroya taşıyıp karbon desenli üçgen akü kutusu, gidon ekranı ve çift LED farla bitirdim. İstasyonda aşamaları seçip montajı ve standda motor testini izleyebilirsin.',
     proje: 'personal-projects',
     ayakIzi: [9, 7.6],
     ayakIziMerkez: [-0.3, -0.2],
     kamera: { poz: [0.25, 2.45, 5.7], hedef: [-0.05, 0.7, -0.35] },
     mekanizmalar: [
       'Aşama seçimi: operatör parçayı tezgâhtan alır, taşır ve bisiklete takar; geri alınca parçalar anında sökülür',
-      'Aşama 2: tezgâha yaslı motorlu teker arka tekerin yerine, taşıyıcılı kutu pil selenin arkasına',
-      'Aşama 3: taşıyıcı pil sökülür, kırmızı üçgen pil kutusu kadroya, krom far gidona',
-      'Aşama 4: kırmızı bisiklet kenara itilir, siyah kadro standa gelir; motorlu teker eski bisikletten sökülüp siyah kadroya takılır, karbon desenli üçgen pil kutusu (şarj soketli) yerleşir',
+      'Aşama 2: tezgâha yaslı motorlu teker (500 W göbek motoru) arka tekerin yerine, taşıyıcılı akü kutusu selenin arkasına',
+      'Aşama 3: taşıyıcıdaki kutu sökülür, kırmızı üçgen akü kutusu kadroya, krom far gidona',
+      'Aşama 4: kırmızı bisiklet kenara itilir, siyah kadro standa gelir; motorlu teker eski bisikletten sökülüp siyah kadroya takılır, karbon desenli üçgen akü kutusu (şarj soketli) yerleşir',
       'Aşama 5: kontrolcü, gidon ekranı + gaz kolu, çift LED far, sele çantası',
-      'Test: arka teker standda gaza göre döner; gidon ekranı hız ve pil seviyesini, test monitörü güç/menzili gösterir',
+      'Test: arka teker standda gaza göre döner; gidon ekranı hız ve akü seviyesini, test monitörü güç/menzili gösterir',
       'Şarj: şarj cihazının ledi şarjda kırmızı, dolunca yeşil',
     ],
     cikarim: [
-      'Kırmızı/gri donör kadro, taşıyıcılı kutu pil ve yerdeki kontrolcü/şarj cihazı img-03, img-07 ve img-01\'den; siyah kadro, karbon desenli üçgen kutu, sele çantası ve çift far img-04/05/06/10\'dan alındı.',
+      'Kırmızı/gri donör kadro, taşıyıcıdaki akü kutusu ve yerdeki kontrolcü/şarj cihazı img-03, img-07 ve img-01\'den; siyah kadro, karbon desenli üçgen kutu, sele çantası ve çift far img-04/05/06/10\'dan alındı.',
       'img-04\'te siyah kadroda kısa süre kırmızı kutu da görünüyor; istasyonda sade olsun diye aşama 4\'te doğrudan siyah kutuya geçildi.',
-      'Pil gerilimi/kapasitesi fotoğraftan okunamadı: 48 V 13 Ah (≈624 Wh) varsayıldı — 500 W, 30 km/h ve 45 km menzille tutarlı (30 km/h\'de ≈410 W yol gücü ≈ 13.7 Wh/km).',
+      'Akü Kaan\'dan: 4 adet 12 V 9 Ah jel akü seri bağlı → 48 V 9 Ah (≈432 Wh); motor arka tekerde 500 W göbek motoru. Kutular kapalı olduğu için aküler dışarıdan görünmüyor.',
+      'Menzil kullanılabilir ≈%80 kapasite (≈345 Wh) ve yol gücü modeliyle tahmin edilir: 20 km/h karışık sürüşte ≈45 km, sürekli 30 km/h\'de ≈25 km. Gerilim 4 bloklu kurşun-asit eğrisiyle (≈51 V dolu, ≈47 V alt sınır).',
       'Standda teker yüksüz döner (≈30–100 W); menzil yol gücü modeliyle tahmin edilir, standdaki tüketimden değil.',
       'Kadro ölçüleri 26" teker ve fotoğraftaki karo boyutuna (≈33 cm) oranlanarak alındı; kontrolcünün yeri görünmediği için zincir çatalı üstüne konuldu.',
       'personal-img-08/09 ve video-02\'deki paletli RC robot ayrı bir proje; bu istasyonda yok.',
@@ -658,7 +661,7 @@ export function create(lib) {
       ['Pil', `${fmt(volt, 1)} V · %${fmt(soc * 100, 0)}`],
       ['Yolda güç @hız', `${fmt(yolGucu(hiz > 3 ? hiz : 30), 0)} W`],
       ['Menzil (tahmini)', `${fmt(menzil(), 0)} km`],
-      ['BMS', acil ? 'kesik' : bmsHata ? 'hücre dengesizliği' : 'normal'],
+      ['Akü (4 × 12 V 9 Ah jel)', acil ? 'devre açık' : zayifBlok ? '1 blok zayıf' : 'normal'],
     ],
     trend,
     durum: durumBilgi,

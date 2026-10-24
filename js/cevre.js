@@ -7,8 +7,7 @@
 // tüpleri, acil çıkış kapıları + ışıklı levhalar, elektrik panoları, kablo tavası, basınçlı hava hattı.
 // Zemin/lojistik: palet rafları, hammadde ve sevkiyat alanları, bakım atölyesi, kalite kontrol,
 // iki katlı ofis, mola köşesi, atık/geri dönüşüm, zemin bölge çizgileri ve yazıları, lastik izleri.
-// Canlılık: güvercinler (tünek ↔ uçuş ↔ yerde gagalama; kamera/işçi/AGV yaklaşınca kaçar),
-// koridorda AGV (güvenlik tarayıcısı: önünde biri varsa yavaşlar/durur, mavi uyarı spotu),
+// Canlılık: güvercinler (tünek ↔ uçuş ↔ yerde gagalama; kamera/işçi yaklaşınca kaçar),
 // holler arasında yürüyen işçi.
 //
 // Performans: tekrar eden her şey InstancedMesh (raf, palet, yük, tüp, armatür, makas, güvercin);
@@ -487,15 +486,13 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, C = null, d
     cikisKapisi(parca.C, C.x0 + 22, C.z0 + 0.125, 0);                // kuzey duvarı
     levha('baret', 0.5, 0.5, C.x0 - 0.135, C.gecitH + 0.15, C.gecit[1] + 1.6, -PI / 2);
     levha('kulak', 0.5, 0.5, C.x0 + 0.135, C.gecitH + 0.15, C.gecit[0] - 1.6, PI / 2);
-    levha('agv', 0.6, 0.6, C.x1 - 0.135, 2.2, 2.8, -PI / 2);
   } else tup(B.x1 - 0.125, 1.25, -PI / 2);
 
   // uyarı levhaları
   levha('baret', 0.5, 0.5, B.x0 - 0.135, B.gecitH + 0.15, B.gecit[0] - 1.6, -PI / 2);
   levha('kulak', 0.5, 0.5, B.x0 - 0.135, B.gecitH + 0.15, B.gecit[1] + 1.6, -PI / 2);
   levha('baret', 0.5, 0.5, B.x0 + 0.135, B.gecitH + 0.15, B.gecit[1] + 1.6, PI / 2);
-  for (const k of kapiB) { levha('forklift', 0.6, 0.6, k - kwB - 1.0, 2.2, zBa + 0.02, 0); levha('agv', 0.6, 0.6, k + kwB + 1.0, 2.2, zBa + 0.02, 0); }
-  levha('agv', 0.6, 0.6, A.x0 + 0.135, 2.2, -2.8, PI / 2);
+  for (const k of kapiB) levha('forklift', 0.6, 0.6, k - kwB - 1.0, 2.2, zBa + 0.02, 0);
 
   // elektrik pano sırası (MCC): gövde, kapı derzi, kol, durum lambaları, küçük HMI, önünde ikaz şeridi
   function panoSirasi(g, x, z, ry, n) {
@@ -931,11 +928,6 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, C = null, d
     cyl(0.07, 0.08, mat(0xff7a00, { key: 'cevre-tepe', detay: false, ek: { emissive: 0xff7a00, emissiveIntensity: 0.4 } }), -0.4, 2.52, 0, f, { seg: 10 });
   }
 
-  // koridorda AGV durak işaretleri
-  const DURAK = [{ x: -60, z: -1 }, { x: B.x0 + 18, z: -1 }, { x: 40, z: 1 }, { x: -80, z: 1 }];
-  if (C) DURAK.push({ x: C.x0 + 20, z: -1 });   // sunucu odası önü
-  for (const d of DURAK) zeminYazi('agvdurak', 1.3, 0.32, d.x, d.z < 0 ? -1.85 : 1.85, d.z < 0 ? 0 : PI);
-
   // lastik izleri (koridor şeritleri, B raf koridoru, kamyon şeritleri) — tek saydam çizim
   {
     const izDoku = lib.canvasTex(64, 512, (x, w, h) => {
@@ -1074,20 +1066,19 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, C = null, d
     const a = 1 - u;
     return o.set(0, 0, 0).addScaledVector(U.p0, a * a * a).addScaledVector(U.p1, 3 * a * a * u).addScaledVector(U.p2, 3 * a * u * u).addScaledVector(U.p3, u * u * u);
   };
-  function kacKontrol(b, cam, camY, isciP, agvP) {
+  function kacKontrol(b, cam, camY, isciP) {
     const esik = b.durum === 'yer' ? 4.2 : 2.6;
-    const yakin = (camY < 4.5 && b.p.distanceTo(cam) < esik) || (isciP && b.durum === 'yer' && Math.hypot(b.p.x - isciP.x, b.p.z - isciP.z) < 2.6)
-      || (agvP && b.durum === 'yer' && Math.hypot(b.p.x - agvP.x, b.p.z - agvP.z) < 2.4);
+    const yakin = (camY < 4.5 && b.p.distanceTo(cam) < esik) || (isciP && b.durum === 'yer' && Math.hypot(b.p.x - isciP.x, b.p.z - isciP.z) < 2.6);
     if (!yakin) return false;
     birak(b);
     const t = tunekSec(b, b.p);
     if (t) ucur(b, t.p, 'tunek', t.yaw);
     return !!t;
   }
-  function kusGuncelle(b, dt, t, cam, camY, isciP, agvP) {
+  function kusGuncelle(b, dt, t, cam, camY, isciP) {
     const k = b.k;
     b.t += dt;
-    if (b.durum !== 'ucus' && kacKontrol(b, cam, camY, isciP, agvP)) return;
+    if (b.durum !== 'ucus' && kacKontrol(b, cam, camY, isciP)) return;
     if (b.durum === 'tunek') {
       // tünekte: ara sıra dönüş, tüy düzeltme (eğilme), kafa sallama
       const tur = (t * 0.7 + b.faz) % 9;
@@ -1148,85 +1139,6 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, C = null, d
     gIM.dis.setMatrixAt(i * 2, b.disL.matrixWorld); gIM.dis.setMatrixAt(i * 2 + 1, b.disR.matrixWorld);
   }
 
-  // ================================================================= AGV
-  // Koridorda kapalı döngü: doğuya z = −1, batıya z = +1, uçlarda r = 1 m dönüş. Duraklarda 6 sn bekler.
-  // Güvenlik tarayıcısı: önündeki 3.2 m × ±0.9 m alanda kamera (yaya boyu) ya da işçi varsa yavaşlar/durur.
-  const AGV = (() => {
-    const g = new THREE.Group(); g.name = 'cevre-agv';
-    box(1.5, 0.3, 0.8, M.beyaz, 0, 0.21, 0, g);
-    box(0.08, 0.26, 0.84, M.siyah, 0.77, 0.19, 0, g); box(0.08, 0.26, 0.84, M.siyah, -0.77, 0.19, 0, g);
-    for (const s of [-1, 1]) golgesiz(box(1.3, 0.05, 0.01, M.sari, 0, 0.27, s * 0.405, g));
-    box(0.08, 0.06, 0.18, M.siyah, 0.81, 0.13, 0, g);                                  // lazer tarayıcı
-    box(1.36, 0.04, 0.72, M.gri, 0, 0.38, 0, g);
-    for (let i = 0; i < 8; i++) golgesiz(cyl(0.025, 0.7, M.celik, -0.6 + i * 0.17, 0.42, 0, g, { eksen: 'z', seg: 8 }));
-    box(0.6, 0.32, 0.4, M.mavi, -0.32, 0.62, 0, g); box(0.6, 0.32, 0.4, M.mavi, 0.34, 0.62, 0, g);
-    box(0.5, 0.26, 0.36, M.karton, 0.32, 0.91, 0, g);
-    box(0.06, 0.32, 0.06, M.koyu, -0.68, 0.55, 0.3, g);
-    const tepeMat = new THREE.MeshStandardMaterial({ color: 0xff8a00, emissive: 0xff7a00, emissiveIntensity: 0.2, roughness: 0.3 });
-    const tepe = cyl(0.05, 0.08, tepeMat, -0.68, 0.75, 0.3, g, { seg: 12 }); golgesiz(tepe);
-    const ledMat = new THREE.MeshStandardMaterial({ color: 0x1a7a3a, emissive: 0x2bd16a, emissiveIntensity: 1.8, roughness: 0.3 });
-    const led = box(1.52, 0.025, 0.82, ledMat, 0, 0.34, 0, g); golgesiz(led);
-    const spotDoku = lib.canvasTex(64, 64, (x, w) => {
-      const gr = x.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
-      gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.75)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
-      x.fillStyle = gr; x.fillRect(0, 0, w, w);
-    });
-    const spotMat = new THREE.MeshBasicMaterial({ color: 0x2f7dff, map: spotDoku, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
-    const spot = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), spotMat);
-    spot.rotation.x = -PI / 2; spot.position.set(2.5, 0.012, 0); spot.renderOrder = 2;
-    g.add(spot);
-    lib.sabitle(g, [tepe, led, spot]);
-    kok.add(g);
-    const x0 = A.x0 + 9, x1 = C ? C.x1 - 9 : B.x1 - 11, r = 1.0, L1 = x1 - x0, La = PI * r, LT = 2 * L1 + 2 * La;
-    const nokta = (s, o) => {
-      s = ((s % LT) + LT) % LT;
-      if (s < L1) return o.set(x0 + s, -r, 1, 0);
-      s -= L1;
-      if (s < La) { const f = s / r; return o.set(x1 + r * Math.sin(f), -r * Math.cos(f), Math.cos(f), Math.sin(f)); }
-      s -= La;
-      if (s < L1) return o.set(x1 - s, r, -1, 0);
-      s -= L1;
-      const f = s / r; return o.set(x0 - r * Math.sin(f), r * Math.cos(f), -Math.cos(f), -Math.sin(f));
-    };
-    const durakS = DURAK.map((d) => (d.z < 0 ? d.x - x0 : L1 + La + (x1 - d.x))).sort((a, b) => a - b);
-    return { g, tepeMat, ledMat, spotMat, nokta, LT, durakS, s: 20, v: 0, bekle: 0, sonraki: 0, durum: 'gidiyor', _o: new THREE.Vector4() };
-  })();
-  function agvGuncelle(dt, t, cam, camY, isciP) {
-    const a = AGV, o = a.nokta(a.s, a._o);
-    const ileri = (n) => {           // sıradaki durağa yol boyu uzaklık
-      const d = a.durakS[a.sonraki] - a.s; return ((d % a.LT) + a.LT) % a.LT;
-    };
-    let vHedef = 1.1;
-    const dDurak = ileri();
-    vHedef = Math.min(vHedef, Math.sqrt(2 * 0.7 * Math.max(0, dDurak - 0.03)));
-    // güvenlik tarayıcısı
-    let engel = 0;
-    const tara = (px, pz) => {
-      const dx = px - o.x, dz = pz - o.y, f = dx * o.z + dz * o.w, l = Math.abs(-dx * o.w + dz * o.z);
-      if (f > 0.6 && f < 3.4 && l < 0.95) engel = Math.max(engel, f < 1.9 ? 2 : 1);
-    };
-    if (camY < 2.8) tara(cam.x, cam.z);
-    if (isciP) tara(isciP.x, isciP.z);
-    if (engel === 2) vHedef = 0; else if (engel === 1) vHedef = Math.min(vHedef, 0.3);
-    if (a.bekle > 0) { a.bekle -= dt; vHedef = 0; if (a.bekle <= 0) a.sonraki = (a.sonraki + 1) % a.durakS.length; }
-    else if (dDurak < 0.04 && a.v < 0.06) { a.bekle = 6; a.v = 0; }
-    const ivme = vHedef > a.v ? 0.6 : 1.4;
-    a.v = vHedef > a.v ? Math.min(vHedef, a.v + ivme * dt) : Math.max(vHedef, a.v - ivme * dt);
-    a.s = (a.s + a.v * dt) % a.LT;
-    a.nokta(a.s, o);
-    a.g.position.set(o.x, 0, o.y);
-    a.g.rotation.y = Math.atan2(-o.w, o.z);
-    // ışıklar: hareket → yeşil şerit + turuncu tepe lambası çakar; engel → kırmızı; durakta → mavi
-    const durum = engel === 2 ? 'engel' : a.bekle > 0 ? 'durak' : 'gidiyor';
-    if (durum !== a.durum) {
-      a.durum = durum;
-      const c = durum === 'engel' ? 0xff3b2a : durum === 'durak' ? 0x3d8bff : 0x2bd16a;
-      a.ledMat.emissive.setHex(c); a.ledMat.color.setHex(c).multiplyScalar(0.4);
-    }
-    a.tepeMat.emissiveIntensity = a.v > 0.05 || durum === 'engel' ? (Math.sin(t * 9) > 0 ? 2.6 : 0.15) : 0.15;
-    a.spotMat.opacity = a.v > 0.02 ? 0.65 + Math.sin(t * 6) * 0.2 : 0.35;
-  }
-
   // ================================================================= İŞÇİ
   const isci = lib.operator({ baret: 0xf5f5f5, yelek: 0xff8a1f });
   isci.group.name = 'cevre-isci';
@@ -1284,14 +1196,13 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, C = null, d
       for (const g of b.g) if (g.visible !== gor) g.visible = gor;
     }
     isciGuncelle(dt, t);
-    agvGuncelle(dt, t, _cam, camY, IS.p);
-    for (let i = 0; i < kuslar.length; i++) { kusGuncelle(kuslar[i], dt, t, _cam, camY, IS.p, AGV.g.position); kusYaz(i, kuslar[i]); }
+    for (let i = 0; i < kuslar.length; i++) { kusGuncelle(kuslar[i], dt, t, _cam, camY, IS.p); kusYaz(i, kuslar[i]); }
     for (const im of Object.values(gIM)) im.instanceMatrix.needsUpdate = true;
   }
   update(0, 0);
 
   return {
-    update, kok, cati, kuslar, AGV, isci: IS, cakisma, dolu, birlesim, tunekler,
+    update, kok, cati, kuslar, isci: IS, cakisma, dolu, birlesim, tunekler,
     _sayac() { let n = 0; kok.traverseVisible((o) => { if (o.isMesh || o.isPoints) n++; }); return n; },
   };
 

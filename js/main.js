@@ -1089,7 +1089,7 @@ try {
   scene.add(yazi);
 }
 // Ortam ve canlılık: çatı/armatür/duvar detayları, raflar ve lojistik alanları, güvercinler,
-// koridor AGV'si, holler arası yürüyen işçi (js/cevre.js). Kurulamazsa fabrika olduğu gibi açılır.
+// holler arası yürüyen işçi (js/cevre.js). Kurulamazsa fabrika olduğu gibi açılır.
 let cevre = null;
 try {
   const { cevreKur } = await import('./cevre.js');

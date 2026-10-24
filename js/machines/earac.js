@@ -1,24 +1,25 @@
-// js/machines/earac.js — Üniversite Elektrikli Araç Projesi (TEMSİLİ).
+// js/machines/earac.js — MAVERA · Üniversite Elektrikli Araç (TÜBİTAK Efficiency Challenge).
 //
-// Kaan üniversite elektrikli araç proje ekibinde yer aldı (CV: "üniversite elektrikli araç proje
-// ekibi üyeliği"); aracın kendisinin fotoğrafı/ölçüsü yok. Temsili model: verimlilik yarışı
-// (Efficiency Challenge) tipi tek kişilik aerodinamik araç — damla gövde, kabarcık kanopi,
-// 4 teker, arka sağ tekerde göbek motoru. Şasi dinamometresinde: arka tekerler makaralarda,
-// önde soğutma fanı, yanda dyno kontrol masası. Üst kabuk arkadan menteşeli kalkar; altta
-// alüminyum şasi, koltuk, direksiyon, LiFePO4 pil paketi + BMS, motor sürücü, HV kabloları.
+// Kaan üniversitede MAVERA takımıyla TÜBİTAK Efficiency Challenge'a katıldı (4 tekerli araç).
+// Gövde takımın araç fotoğrafından: açık gri astar boyalı kabuk, burundan kuyruğa mavi şerit,
+// siyah çerçeveli geniş ön cam, oval yan camlar, yukarı açılan makas kapı, çamurluk üstünde
+// aynalar, ön kaputta mandallı servis kapağı, ön tamponda üçer led çizgi, arka kanat.
+// Kabuk tek parça "loft": x boyunca kesit anahtarlarından örülür; cam, kapı ve kapak bölgeleri
+// aynı ızgaradan ayrı mesh'lere ayrılır (kapı/kapak menteşede döner, köşe normalleri ortak).
+// Ölçüler fotoğraftan tahmin (≈2.7 × 1.3 × 1.05 m); kapak altı donanım ve şasi dinamometresi temsili.
 
 export function create(lib) {
   const {
-    THREE, M, box, cyl, rod, pipe, mat, lamba, Ekran, Trend, levha, canvasTex,
-    clamp, lerp, approach, damp, easeInOut, fmt, throttle, gurultu,
+    THREE, M, box, cyl, rod, pipe, sphere, mat, lamba, Ekran, Trend, levha, canvasTex,
+    clamp, lerp, approach, easeInOut, fmt, throttle,
   } = lib;
 
   const g = new THREE.Group();
   const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
-  const CX = 0.4, CZ = -0.3, CY = 0.11;   // araç merkezi (dyno üstünde, tekerler 11 cm yukarıda)
+  const CX = 0.4, CZ = -0.3, CY = 0.08;               // araç merkezi (dyno platformu üstünde)
+  const RA = -0.85, FA = 0.9, IZ = 0.53, R = 0.26;    // arka / ön aks (araç-yerel x), iz yarısı, teker yarıçapı
 
   // ---------------------------------------------------------------- dinamometre platformu
-  const RA = -0.95, FA = 0.95;               // arka / ön aks (araç-yerel x)
   const gri = mat(0x5d656d, { r: 0.6, m: 0.5, key: 'ea-platform' });
   const PX0 = CX - 1.95, PX1 = CX + 1.85, PGAP0 = CX + RA - 0.32, PGAP1 = CX + RA + 0.32;
   box(PGAP0 - PX0, 0.08, 1.7, gri, (PX0 + PGAP0) / 2, 0.04, CZ, g);
@@ -29,106 +30,402 @@ export function create(lib) {
   // makaralar: her arka tekerin altında iki makara
   const makaralar = [];
   for (const sz of [-1, 1]) for (const dx of [-0.13, 0.13]) {
-    const m = cyl(0.085, 0.24, M.celik, CX + RA + dx, 0.025, CZ + sz * 0.42, g, { eksen: 'z', seg: 20 });
-    makaralar.push(m);
+    makaralar.push(cyl(0.085, 0.26, M.celik, CX + RA + dx, 0.03, CZ + sz * IZ, g, { eksen: 'z', seg: 20 }));
   }
   for (const sz of [-1, 1]) {   // fren/volan ünitesi + kayış kapağı
-    box(0.42, 0.34, 0.2, mat(0x23487a, { r: 0.5, m: 0.3, key: 'ea-dyno' }), CX + RA, 0.17, CZ + sz * 0.98, g);
-    cyl(0.12, 0.06, M.koyu, CX + RA, 0.2, CZ + sz * 1.1, g, { eksen: 'z', seg: 20 });
+    box(0.42, 0.34, 0.2, mat(0x23487a, { r: 0.5, m: 0.3, key: 'ea-dyno' }), CX + RA, 0.17, CZ + sz * 1.0, g);
+    cyl(0.12, 0.06, M.koyu, CX + RA, 0.2, CZ + sz * 1.12, g, { eksen: 'z', seg: 20 });
   }
-  // ön teker takozları
-  for (const sz of [-1, 1]) box(0.34, 0.03, 0.16, M.sari, CX + FA, 0.095, CZ + sz * 0.53, g);
+  for (const sz of [-1, 1]) for (const dx of [-0.29, 0.29]) box(0.08, 0.07, 0.15, M.sari, CX + FA + dx, 0.115, CZ + sz * IZ, g);   // ön teker takozları
 
-  // ---------------------------------------------------------------- araç (yerel: +X burun, zemin y=0)
+  // ---------------------------------------------------------------- araç (yerel: +X burun, +Z sağ yan, zemin y=0)
   const arac = new THREE.Group();
   arac.position.set(CX, CY, CZ);
   g.add(arac);
-  // damla gövde profili (yarıçap, burundan uzaklık): kesit dairesel, yükseklikte ×0.72
-  const prof = [[0, 0], [0.2, 0.06], [0.32, 0.16], [0.42, 0.35], [0.48, 0.6], [0.5, 0.95], [0.49, 1.3], [0.45, 1.8], [0.36, 2.3], [0.24, 2.7], [0.12, 2.92], [0.02, 3.0]]
-    .map(([r, a]) => new THREE.Vector2(r, a));
-  const L = 3.0, YM = 0.42, SY = 0.72;
-  function govdeYarisi(ust) {
-    const geo = new THREE.LatheGeometry(prof, 36, ust ? 0 : Math.PI, Math.PI);
-    geo.rotateZ(Math.PI / 2);          // eksen Y → −X (burun +X'te kalsın diye kaydırılır)
-    geo.scale(1, SY, 1);
-    geo.translate(L / 2, YM, 0);
-    geo.computeVertexNormals();
-    return geo;
+
+  // Kesit anahtarları [x, w, yb, yw, ysh, zc, yc, zr, yr, yt] → yarım kesit kontrol noktaları
+  // (0,yb) (.8w,yb) (w,yb+.1) (w,yw) (.9w,ysh) (zc,yc) (zr,yr) (0,yt): taban, yan, omuz,
+  // çamurluk tepesi / kabin yanı, kaput / tavan kenarı, orta çizgi. Kaputta zc/yc çamurluk
+  // tümseği (kaput ortası biraz aşağıda), kabinde içe eğik cam yanı (tumblehome).
+  const KESIT = [
+    [-1.35, 0.53, 0.21, 0.34, 0.55, 0.38, 0.61, 0.22, 0.64, 0.64],
+    [-1.12, 0.60, 0.17, 0.33, 0.58, 0.43, 0.66, 0.27, 0.72, 0.74],
+    [-0.85, 0.64, 0.15, 0.33, 0.60, 0.47, 0.72, 0.31, 0.84, 0.87],
+    [-0.55, 0.65, 0.14, 0.33, 0.60, 0.49, 0.77, 0.34, 0.95, 0.99],
+    [-0.22, 0.65, 0.14, 0.33, 0.60, 0.50, 0.79, 0.36, 1.00, 1.04],
+    [0.05, 0.65, 0.14, 0.33, 0.60, 0.50, 0.76, 0.36, 0.88, 0.90],
+    [0.32, 0.65, 0.14, 0.33, 0.60, 0.48, 0.69, 0.28, 0.67, 0.67],
+    [0.62, 0.65, 0.14, 0.33, 0.58, 0.48, 0.65, 0.25, 0.59, 0.58],
+    [0.90, 0.65, 0.15, 0.32, 0.55, 0.49, 0.61, 0.25, 0.54, 0.53],
+    [1.15, 0.63, 0.17, 0.31, 0.48, 0.47, 0.54, 0.24, 0.49, 0.48],
+    [1.35, 0.58, 0.20, 0.30, 0.40, 0.44, 0.45, 0.22, 0.43, 0.42],
+  ];
+  function kesitAt(x) {   // anahtarlar arası kübik Hermite (sonlu fark eğimleri)
+    let i = 0;
+    while (i < KESIT.length - 2 && x > KESIT[i + 1][0]) i++;
+    const A = KESIT[i], B = KESIT[i + 1], h = B[0] - A[0], t = clamp((x - A[0]) / h, 0, 1);
+    const t2 = t * t, t3 = t2 * t;
+    const h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2, h11 = t3 - t2;
+    const egim = (j, c) => {
+      const a = KESIT[Math.max(0, j - 1)], b = KESIT[Math.min(KESIT.length - 1, j + 1)];
+      return (b[c] - a[c]) / (b[0] - a[0]);
+    };
+    const out = [];
+    for (let c = 1; c < 10; c++) out.push(h00 * A[c] + h10 * h * egim(i, c) + h01 * B[c] + h11 * h * egim(i + 1, c));
+    return out;
   }
-  const kabukTex = canvasTex(512, 256, (x, w, h) => {
-    x.fillStyle = '#f2f4f6'; x.fillRect(0, 0, w, h);
-    for (const u of [0.1, 0.9]) {   // iki yanda takım şeridi (lacivert + kırmızı ince)
-      x.fillStyle = '#1d4f91'; x.fillRect(w * (u - 0.035), 0, w * 0.07, h);
-      x.fillStyle = '#d0302a'; x.fillRect(w * (u + (u < 0.5 ? 0.045 : -0.06)), 0, w * 0.015, h);
+  const NH = 44, NS = 110, XMIN = -1.35, XMAX = 1.35, LT = XMAX - XMIN, NR = 2 * NH;
+  const _kn = Array.from({ length: 8 }, () => new THREE.Vector3());
+  const yariEgri = new THREE.CatmullRomCurve3(_kn, false, 'centripetal');
+  function yariKesit(x) {   // alt ortadan tavan ortasına eşit yay aralıklı NH+1 nokta (x=z, y=y)
+    const [w, yb, yw, ysh, zc, yc, zr, yr, yt] = kesitAt(x);
+    [[0, yb], [0.8 * w, yb], [w, yb + 0.1], [w, yw], [0.9 * w, ysh], [zc, yc], [zr, yr], [0, yt]]
+      .forEach(([z, y], i) => _kn[i].set(z, y, 0));
+    yariEgri.updateArcLengths();
+    return { pts: yariEgri.getSpacedPoints(NH), len: yariEgri.getLength(), ym: (yb + yt) / 2 };
+  }
+  // burun ve kuyruk: son ~15 cm'de kesit elips çeyreğiyle merkezine büzülür (küt, yuvarlak uç)
+  const ucOlcek = (x) => {
+    if (x > 1.15) { const f = (x - 1.15) / (XMAX - 1.15); return Math.sqrt(Math.max(0, 1 - f * f)); }
+    if (x < -1.2) { const f = (-1.2 - x) / (-1.2 - XMIN); return Math.sqrt(Math.max(0, 1 - f * f)); }
+    return 1;
+  };
+
+  // doku uzayı: u = x, v = tavan ortasından imzalı yay uzunluğu s (+ sağ yan), ikisi de metre
+  const KPX = 512, SMAX = 1.7, TW = Math.ceil(LT * KPX), TH = Math.ceil(2 * SMAX * KPX);
+  const P = (x, s) => [(x - XMIN) * KPX, (SMAX + s) * KPX];   // (x, s) → kanvas pikseli
+  const pos = new Float32Array(NS * (NR + 1) * 3), uv = new Float32Array(NS * (NR + 1) * 2);
+  const sDizi = new Float32Array(NS * (NR + 1));
+  for (let i = 0; i < NS; i++) {
+    const u = i / (NS - 1);
+    const x = XMIN + LT * (0.5 * u + 0.25 * (1 - Math.cos(Math.PI * u)));   // uçlarda sık
+    const { pts, len, ym } = yariKesit(x);
+    const k = ucOlcek(x);
+    for (let j = 0; j <= NR; j++) {
+      const sag = j <= NH, kk = sag ? j : NR - j, p = pts[kk], sg = sag ? 1 : -1;
+      const n = i * (NR + 1) + j, s = sg * len * (1 - kk / NH) * k;
+      pos[n * 3] = x; pos[n * 3 + 1] = ym + (p.y - ym) * k; pos[n * 3 + 2] = sg * p.x * k;
+      uv[n * 2] = ((x - XMIN) * KPX) / TW; uv[n * 2 + 1] = 1 - ((SMAX + s) * KPX) / TH;
+      sDizi[n] = s;
+    }
+  }
+
+  // bölgeler (x, s): süper elips / eğik elips; aynı fonksiyonlar hem yüz ayırmada hem boyamada
+  const se = (a, b, n) => Math.pow(Math.abs(a), n) + Math.pow(Math.abs(b), n);
+  const sgn = (v) => (v < 0 ? -1 : 1);
+  const WS = { x0: -0.15, x1: 0.30 };                                   // ön cam
+  const wsYari = (x) => lerp(0.5, 0.37, clamp((WS.x1 - x) / (WS.x1 - WS.x0), 0, 1));
+  const WSc = (WS.x0 + WS.x1) / 2, WSa = (WS.x1 - WS.x0) / 2;
+  const onCam = (x, s, pay = 0) => se((x - WSc) / (WSa + pay), s / (wsYari(x) + pay), 4) < 1;
+  const YC = { x: -0.24, s: 0.72, ax: 0.21, as: 0.13, egim: -0.2 };      // oval yan cam (önü yukarıda)
+  const yanCam = (x, s, pay = 0) => {
+    const dx = x - YC.x, ds = Math.abs(s) - (YC.s + YC.egim * dx);
+    return (dx / (YC.ax + pay)) ** 2 + (ds / (YC.as + pay)) ** 2 < 1;
+  };
+  const KP = { x0: -0.52, x1: 0.12, s0: 0.52, s1: 1.18 };                // kapı
+  const KPc = (KP.x0 + KP.x1) / 2, KPa = (KP.x1 - KP.x0) / 2, KPsc = (KP.s0 + KP.s1) / 2, KPsa = (KP.s1 - KP.s0) / 2;
+  const kapiIc = (x, s, pay = 0) => se((x - KPc) / (KPa + pay), (Math.abs(s) - KPsc) / (KPsa + pay), 6) < 1;
+  const KK = { x0: 0.58, x1: 1.05, s: 0.26 };                           // ön servis kapağı
+  const KKc = (KK.x0 + KK.x1) / 2, KKa = (KK.x1 - KK.x0) / 2;
+  const kapakIc = (x, s, pay = 0) => se((x - KKc) / (KKa + pay), s / (KK.s + pay), 6) < 1;
+  // Yüz ayırma: kenarı geçen yüzler iki tarafa da girer, asıl sınırı doku maskesi (alphaTest)
+  // çizer → cam, kapı, kapak ve teker davlumbazı kenarları merdivensiz. Cam yüzleri biraz taşar;
+  // polygonOffset ile gövdenin arkasında kalır (yalnız maskenin kestiği yerde görünür).
+  const PAY = 0.05, DAVLUMBAZ = 0.29;
+  const IND = { govde: [], cam: [], kapi: [], kapiCam: [], kapak: [] }, tum = [];
+  for (let i = 0; i < NS - 1; i++) for (let j = 0; j < NR; j++) {
+    const a = i * (NR + 1) + j, b = a + 1, c = a + NR + 1, d = c + 1, q = [a, c, b, b, c, d];
+    const ort = (o) => (pos[a * 3 + o] + pos[b * 3 + o] + pos[c * 3 + o] + pos[d * 3 + o]) / 4;
+    const x = ort(0), s = (sDizi[a] + sDizi[b] + sDizi[c] + sDizi[d]) / 4;
+    tum.push(...q);   // dış yüz dışa bakar
+    const tamCam = onCam(x, s, -PAY) || yanCam(x, s, -PAY), tamKapi = s > 0 && kapiIc(x, s, -PAY);
+    if (!tamCam && !tamKapi && !kapakIc(x, s, -PAY)) IND.govde.push(...q);
+    if (onCam(x, s, PAY) || (s < 0 && yanCam(x, s, PAY))) IND.cam.push(...q);
+    if (s > 0 && yanCam(x, s, PAY)) IND.kapiCam.push(...q);
+    if (s > 0 && kapiIc(x, s, PAY) && !yanCam(x, s, -PAY)) IND.kapi.push(...q);
+    if (kapakIc(x, s, PAY)) IND.kapak.push(...q);
+  }
+  // davlumbaz sınırı (x, s): her x'te yan duvarın daire tepesine (y = R + √(r² − dx²)) eriştiği s,
+  // alt kenar tabanda |z| = 0.42 → maskede bu çokgen kesilir
+  const yayS = (pts, len, k) => len * (1 - k / NH);
+  function davlumbazYol(ax, sg) {
+    const ust = [], alt = [], dxm = Math.sqrt(DAVLUMBAZ ** 2 - (0.14 - R) ** 2);
+    for (let i = 0; i <= 40; i++) {
+      const x = ax - dxm + (2 * dxm * i) / 40, yT = R + Math.sqrt(Math.max(0, DAVLUMBAZ ** 2 - (x - ax) ** 2));
+      const { pts, len } = yariKesit(x);
+      let kb = 0;
+      while (kb < NH && pts[kb].x < 0.42) kb++;
+      let kt = kb;
+      while (kt < NH && pts[kt + 1].x > 0.42 && pts[kt + 1].y < yT) kt++;
+      const p0 = pts[kt], p1 = pts[Math.min(NH, kt + 1)];
+      const f = p1.y > p0.y ? clamp((yT - p0.y) / (p1.y - p0.y), 0, 1) : 0;
+      ust.push([x, sg * yayS(pts, len, kt + (p1.x > 0.42 ? f : 0))]);
+      alt.push([x, sg * yayS(pts, len, kb)]);
+    }
+    return [...ust, ...alt.reverse()];
+  }
+  const tamGeo = new THREE.BufferGeometry();
+  tamGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  tamGeo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  tamGeo.setIndex(tum);
+  tamGeo.computeVertexNormals();
+  const parcaGeo = (ind) => {   // aynı köşe dizileri, farklı indeks (dikişte normaller ortak)
+    const gg = new THREE.BufferGeometry();
+    for (const k of ['position', 'normal', 'uv']) gg.setAttribute(k, tamGeo.attributes[k]);
+    gg.setIndex(ind);
+    return gg;
+  };
+
+  // ---------------------------------------------------------------- gövde dokusu (astar gri, şerit, çerçeveler)
+  const sePts = (xc, ax, sFn, n, N = 140) => {
+    const out = [];
+    for (let i = 0; i < N; i++) {
+      const t = (i / N) * Math.PI * 2, c = Math.cos(t), sn = Math.sin(t);
+      const x = xc + ax * sgn(c) * Math.pow(Math.abs(c), 2 / n);
+      out.push([x, sFn(x, sgn(sn) * Math.pow(Math.abs(sn), 2 / n))]);
+    }
+    return out;
+  };
+  const onCamYol = (pay) => sePts(WSc, WSa + pay, (x, k) => k * (wsYari(x) + pay), 4);
+  const kapiYol = (sg, pay) => sePts(KPc, KPa + pay, (x, k) => sg * (KPsc + k * (KPsa + pay)), 6);
+  const kapakYol = (pay) => sePts(KKc, KKa + pay, (x, k) => k * (KK.s + pay), 6);
+  const yanCamYol = (sg, pay) => {
+    const out = [];
+    for (let i = 0; i < 120; i++) {
+      const t = (i / 120) * Math.PI * 2, dx = (YC.ax + pay) * Math.cos(t);
+      out.push([YC.x + dx, sg * (YC.s + YC.egim * dx + (YC.as + pay) * Math.sin(t))]);
+    }
+    return out;
+  };
+  const yolCiz = (x, pts, k = 1) => {
+    x.beginPath();
+    pts.forEach(([px, ps], i) => { const [cx, cy] = P(px, ps); if (i) x.lineTo(cx * k, cy * k); else x.moveTo(cx * k, cy * k); });
+    x.closePath();
+  };
+  const govdeTex = canvasTex(TW, TH, (x) => {
+    const yol = (pts) => yolCiz(x, pts);
+    x.fillStyle = '#b3b8bd'; x.fillRect(0, 0, TW, TH);
+    for (let i = 0; i < 240; i++) {   // mat astarın hafif ton dalgası
+      x.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,0.035)' : 'rgba(80,88,96,0.03)';
+      x.beginPath(); x.arc(Math.random() * TW, Math.random() * TH, 25 + Math.random() * 90, 0, Math.PI * 2); x.fill();
+    }
+    // servis kapağı: açık panel + derz + mandallar
+    x.fillStyle = '#e6e8eb'; yol(kapakYol(0)); x.fill();
+    x.fillStyle = '#1d3f9e'; x.fillRect(0, (SMAX - 0.065) * KPX, TW, 0.13 * KPX);   // mavi şerit (burundan kuyruğa)
+    x.save();   // MAVERA logosu: önden okunur (harf üstü ön cama bakar)
+    const [lx, ly] = P(0.8, 0);
+    x.translate(lx, ly); x.rotate(-Math.PI / 2);
+    x.fillStyle = '#e6e8eb'; x.fillRect(-0.2 * KPX, -0.125 * KPX, 0.4 * KPX, 0.2 * KPX);
+    x.fillStyle = '#1b2f6e';
+    x.beginPath();
+    x.moveTo(-0.17 * KPX, -0.025 * KPX); x.lineTo(0, -0.11 * KPX); x.lineTo(0.17 * KPX, -0.025 * KPX);
+    x.lineTo(0.13 * KPX, -0.025 * KPX); x.lineTo(0, -0.08 * KPX); x.lineTo(-0.13 * KPX, -0.025 * KPX);
+    x.closePath(); x.fill();
+    x.font = `700 ${Math.round(0.068 * KPX)}px "Space Grotesk", "Segoe UI", sans-serif`;
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText('MAVERA', 0, 0.025 * KPX);
+    x.restore();
+    x.strokeStyle = '#41464d'; x.lineWidth = 0.007 * KPX; yol(kapakYol(0)); x.stroke();
+    x.fillStyle = '#5a6068';
+    for (const s of [-0.12, 0.12]) { const [cx, cy] = P(1.035, s); x.fillRect(cx - 0.018 * KPX, cy - 0.012 * KPX, 0.036 * KPX, 0.024 * KPX); }
+    for (const s of [-0.06, 0.06]) { const [cx, cy] = P(0.6, s); x.beginPath(); x.arc(cx, cy, 0.007 * KPX, 0, Math.PI * 2); x.fill(); }
+    // ön cam ve yan cam çerçeveleri, kapı derzleri (iki yan)
+    x.fillStyle = '#0d0f12'; yol(onCamYol(0.045)); x.fill();
+    for (const sg of [1, -1]) {
+      x.fillStyle = '#0d0f12'; yol(yanCamYol(sg, 0.035)); x.fill();
+      x.strokeStyle = '#3c4148'; x.lineWidth = 0.006 * KPX; yol(kapiYol(sg, 0)); x.stroke();
+    }
+    // kapıda takım adı: sağda düz, solda 180° (her iki yandan soldan sağa okunur)
+    for (const sg of [1, -1]) {
+      x.save();
+      const [tx, ty] = P(-0.2, sg * 0.97);
+      x.translate(tx, ty); if (sg < 0) x.rotate(Math.PI);
+      x.fillStyle = '#1b2f6e'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.font = `700 ${Math.round(0.07 * KPX)}px "Space Grotesk", "Segoe UI", sans-serif`;
+      x.fillText('MAVERA', 0, 0);
+      x.font = `600 ${Math.round(0.024 * KPX)}px "Space Grotesk", "Segoe UI", sans-serif`;
+      x.fillText('TÜBİTAK EFFICIENCY CHALLENGE', 0, 0.06 * KPX);
+      x.restore();
     }
   });
-  const kabukMat = new THREE.MeshStandardMaterial({ map: kabukTex, roughness: 0.28, metalness: 0.05, side: THREE.DoubleSide });
-  const tabanMat = new THREE.MeshStandardMaterial({ color: 0x1d1f23, roughness: 0.5, metalness: 0.2, side: THREE.DoubleSide });
-  const alt = new THREE.Mesh(govdeYarisi(false), tabanMat); alt.castShadow = true; alt.receiveShadow = true; arac.add(alt);
-  // üst kabuk: arkadan menteşeli (pivot kuyrukta)
-  const PIV = V(-1.42, YM, 0);
-  const kabuk = new THREE.Group(); kabuk.position.copy(PIV); arac.add(kabuk);
-  const ust = new THREE.Mesh(govdeYarisi(true), kabukMat); ust.position.set(-PIV.x, -PIV.y, 0); ust.castShadow = true; kabuk.add(ust);
-  const kanopiMat = new THREE.MeshStandardMaterial({ color: 0x1c2b3a, transparent: true, opacity: 0.62, roughness: 0.05, metalness: 0.3, depthWrite: false });
-  const kanopi = new THREE.Mesh(new THREE.SphereGeometry(0.5, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2), kanopiMat);
-  kanopi.scale.set(0.62, 0.72, 0.36); kanopi.position.set(0.12 - PIV.x, 0.6 - PIV.y, 0);
-  kabuk.add(kanopi);
-  const numara = levha(['07'], 0.26, 0.26, { bg: '#ffffff', fg: '#1d4f91', font: 150, px: 256 });
-  numara.position.set(0.55 - PIV.x, 0.5 - PIV.y, 0.497); numara.rotation.set(-0.2, 0.05, 0);
-  kabuk.add(numara);
+  // maskeler (yarım çözünürlük; beyaz = görünür): gövde camları/kapıyı/kapağı keser, kapı ve kapak yalnız kendini tutar
+  const MK = 0.5, MW = Math.round(TW * MK), MH = Math.round(TH * MK);
+  const maske = (zemin, ciz) => canvasTex(MW, MH, (x) => { x.fillStyle = zemin; x.fillRect(0, 0, MW, MH); ciz(x, (pts, renk) => { x.fillStyle = renk; yolCiz(x, pts, MK); x.fill(); }); }, { srgb: false });
+  const mGovde = maske('#fff', (x, dol) => { for (const ax of [FA, RA]) for (const sg of [1, -1]) dol(davlumbazYol(ax, sg), '#000'); dol(onCamYol(0), '#000'); dol(yanCamYol(1, 0), '#000'); dol(yanCamYol(-1, 0), '#000'); dol(kapiYol(1, 0), '#000'); dol(kapakYol(0), '#000'); });
+  const mKapi = maske('#000', (x, dol) => { dol(kapiYol(1, 0), '#fff'); dol(yanCamYol(1, 0), '#000'); });
+  const mKapak = maske('#000', (x, dol) => dol(kapakYol(0), '#fff'));
+  const disMat = (alphaMap) => lib.detayEkle(new THREE.MeshStandardMaterial({ map: govdeTex, alphaMap, alphaTest: 0.5, roughness: 0.46, metalness: 0.04 }), 'boya');
+  const icMatY = (alphaMap) => new THREE.MeshStandardMaterial({ color: 0x2b2e33, roughness: 0.9, metalness: 0, side: THREE.BackSide, alphaMap, alphaTest: 0.5 });
+  const camMat = new THREE.MeshStandardMaterial({
+    color: 0x16202a, roughness: 0.05, metalness: 0.45, transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide,
+    polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 4,
+  });
+  const yuzeyMesh = (ind, m, parent) => {
+    const o = new THREE.Mesh(parcaGeo(ind), m);
+    o.castShadow = m !== camMat; o.receiveShadow = true;
+    parent.add(o);
+    return o;
+  };
+  yuzeyMesh(IND.govde, disMat(mGovde), arac);
+  yuzeyMesh(IND.govde, icMatY(mGovde), arac);   // kabuğun içi (kapı/kapak açılınca, camdan bakınca koyu)
+  yuzeyMesh(IND.cam, camMat, arac);
+  // makas kapı: menteşe kapının ön alt köşesinde; önce hafif dışa döner, sonra yukarı kalkar
+  const KAPI_M = V(0.1, 0.55, 0.6);
+  const kapiPivot = new THREE.Group(); kapiPivot.position.copy(KAPI_M); arac.add(kapiPivot);
+  const kapiKol = new THREE.Group(); kapiPivot.add(kapiKol);
+  const kapiIcG = new THREE.Group(); kapiIcG.position.copy(KAPI_M).negate(); kapiKol.add(kapiIcG);
+  yuzeyMesh(IND.kapi, disMat(mKapi), kapiIcG); yuzeyMesh(IND.kapi, icMatY(mKapi), kapiIcG); yuzeyMesh(IND.kapiCam, camMat, kapiIcG);
+  // ön servis kapağı: menteşe ön cam tarafında, burun tarafı kalkar
+  const KAPAK_M = V(KK.x0, 0.6, 0);
+  const kapakPivot = new THREE.Group(); kapakPivot.position.copy(KAPAK_M); arac.add(kapakPivot);
+  const kapakIcG = new THREE.Group(); kapakIcG.position.copy(KAPAK_M).negate(); kapakPivot.add(kapakIcG);
+  yuzeyMesh(IND.kapak, disMat(mKapak), kapakIcG); yuzeyMesh(IND.kapak, icMatY(mKapak), kapakIcG);
 
-  // iç donanım (araç-yerel)
-  const alu = M.alu;
-  for (const s of [-1, 1]) {
-    rod(V(-1.3, 0.13, s * 0.17), V(1.2, 0.13, s * 0.2), 0.015, alu, arac, 8);
-    rod(V(-0.55, 0.13, s * 0.19), V(-0.55, 0.74, s * 0.13), 0.014, alu, arac, 8);   // devrilme çemberi
+  // yüzeye oturan ekler için ışın (kurulumda bir kez)
+  const _rc = new THREE.Raycaster(), _rm = new THREE.Mesh(tamGeo, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  const yuzey = (o, d) => {
+    _rc.set(o, d.normalize());
+    const h = _rc.intersectObject(_rm)[0];
+    return h ? { p: h.point.clone(), n: h.face.normal.clone() } : null;
+  };
+  const govdeDuz = mat(0xb3b8bd, { r: 0.46, m: 0.04, key: 'ea-govde' });
+  const cizgi = (pts, r, m) => {
+    if (pts.length < 2) return;
+    const o = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length * 3, r, 6), m);
+    arac.add(o);
+  };
+  // ön tampon: iki yanda üçer led çizgi; arkada stop lambaları
+  const ledOn = lamba(0xeef3ff, 0.3), ledArka = lamba(0xff2a1f, 0.3);
+  for (const sg of [1, -1]) {
+    for (let k = 0; k < 3; k++) {
+      const pts = [];
+      for (let i = 0; i <= 8; i++) {
+        const h = yuzey(V(3, 0.25 + k * 0.034, sg * (0.13 + i * 0.046 - k * 0.012)), V(-1, 0, 0));
+        if (h) pts.push(h.p.addScaledVector(h.n, 0.004));
+      }
+      cizgi(pts, 0.0055, ledOn);
+    }
+    const pts = [];
+    for (let i = 0; i <= 6; i++) {
+      const h = yuzey(V(-3, 0.52, sg * (0.16 + i * 0.045)), V(1, 0, 0));
+      if (h) pts.push(h.p.addScaledVector(h.n, 0.004));
+    }
+    cizgi(pts, 0.011, ledArka);
   }
-  for (const x of [-1.2, -0.55, 0.2, 0.9]) rod(V(x, 0.13, -0.2), V(x, 0.13, 0.2), 0.012, alu, arac, 8);
-  rod(V(-0.55, 0.74, -0.13), V(-0.55, 0.74, 0.13), 0.014, alu, arac, 8);
-  const koltuk = mat(0x1e3c6e, { r: 0.85, key: 'ea-koltuk' });
-  box(0.55, 0.04, 0.36, koltuk, -0.15, 0.19, 0, arac).rotation.z = -0.06;
-  box(0.04, 0.46, 0.34, koltuk, -0.46, 0.4, 0, arac).rotation.z = -0.55;   // yatık sırtlık
-  cyl(0.012, 0.42, M.koyu, 0.66, 0.37, 0, arac, { seg: 8 }).rotation.z = 1.05;   // direksiyon mili
-  const dir = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.012, 8, 24), M.siyah);
-  dir.position.set(0.47, 0.47, 0); dir.rotation.y = Math.PI / 2; dir.rotation.x = 0.5; arac.add(dir);
-  for (const s of [-1, 1]) box(0.03, 0.08, 0.05, M.koyu, 1.05, 0.2, s * 0.07, arac);   // pedallar
-  const pil = mat(0x2a2e33, { r: 0.6, m: 0.2, key: 'ea-pil' });
-  box(0.44, 0.16, 0.34, pil, -0.88, 0.22, 0, arac);
-  box(0.44, 0.01, 0.34, mat(0xef7d00, { r: 0.6, key: 'ea-hv' }), -0.88, 0.305, 0, arac);   // HV turuncu kapak
-  box(0.18, 0.025, 0.12, mat(0x1f7a3a, { r: 0.5, key: 'ea-bms' }), -0.86, 0.32, 0.07, arac);  // BMS kartı
-  for (let i = 0; i < 4; i++) box(0.02, 0.012, 0.02, M.koyu, -0.93 + i * 0.03, 0.34, 0.07, arac);
-  box(0.24, 0.07, 0.14, alu, -1.18, 0.2, 0.08, arac);   // motor sürücü
-  for (let i = -2; i <= 2; i++) box(0.24, 0.02, 0.006, alu, -1.18, 0.245, 0.08 + i * 0.024, arac);
-  const hv = mat(0xff6a00, { r: 0.55, key: 'ea-hvkablo' });
-  pipe([V(-0.66, 0.23, 0.12), V(-1.0, 0.22, 0.14), V(-1.06, 0.21, 0.1)], 0.012, hv, arac);
-  pipe([V(-1.3, 0.2, 0.12), V(-1.1, 0.24, 0.3), V(RA, 0.25, 0.36)], 0.012, hv, arac);
-  box(0.1, 0.05, 0.08, M.siyah, -1.2, 0.22, -0.12, arac);   // telemetri
-  rod(V(-1.2, 0.25, -0.12), V(-1.2, 0.48, -0.12), 0.003, M.koyu, arac, 5);
-  const dash = new Ekran(0.13, 0.075, 160);
-  dash.mesh.position.set(0.6, 0.5, 0); dash.mesh.rotation.set(0, -Math.PI / 2, 0); dash.mesh.rotateX(-0.3);
-  arac.add(dash.mesh);
-  // KILL düğmesi (dışarıdan, sağ yanda)
-  box(0.08, 0.08, 0.04, M.sari, 0.2, 0.4, 0.49, arac);
-  cyl(0.028, 0.03, M.kirmizi, 0.2, 0.4, 0.52, arac, { eksen: 'z', seg: 16 });
+  // aynalar (çamurluk üstünde, ön cam dibinde)
+  const aynaCam = mat(0x2a3440, { r: 0.05, m: 0.9, key: 'ea-ayna' });
+  for (const sg of [1, -1]) {
+    const h = yuzey(V(0.38, 2, sg * 0.5), V(0, -1, 0));
+    if (!h) continue;
+    const b = h.p.clone().add(V(-0.03, 0.08, sg * 0.09));
+    rod(h.p, b, 0.012, govdeDuz, arac, 8);
+    sphere(0.05, govdeDuz, b.x - 0.01, b.y + 0.02, b.z + sg * 0.04, arac, 16).scale.set(0.75, 0.95, 1.6);
+    box(0.004, 0.075, 0.13, aynaCam, b.x - 0.048, b.y + 0.02, b.z + sg * 0.04, arac);
+  }
+  // arka kanat (beyaz, ortada mavi şerit)
+  {
+    const hs = [-1, 1].map((sg) => yuzey(V(-1.18, 2, sg * 0.3), V(0, -1, 0)));
+    if (hs[0] && hs[1]) {
+      const y = Math.max(hs[0].p.y, hs[1].p.y) + 0.13;
+      for (const h of hs) rod(h.p, V(h.p.x - 0.02, y, h.p.z), 0.012, M.koyu, arac, 8);
+      const kanat = box(0.2, 0.014, 1.0, M.beyaz, -1.22, y + 0.008, 0, arac); kanat.rotation.z = 0.08;
+      const serit = box(0.2, 0.004, 0.13, mat(0x1d3f9e, { r: 0.5, key: 'ea-serit' }), -1.22, y + 0.017, 0, arac); serit.rotation.z = 0.08;
+    }
+  }
+  // ön camda küçük Türk bayrağı çıkartması (sürücünün sağ üstü)
+  {
+    const h = yuzey(V(-0.08, 2, 0.28), V(0, -1, 0));
+    if (h) {
+      const bayrak = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.06), new THREE.MeshStandardMaterial({
+        roughness: 0.6, map: canvasTex(96, 64, (x, w, hh) => {
+          x.fillStyle = '#e30a17'; x.fillRect(0, 0, w, hh);
+          x.fillStyle = '#fff'; x.beginPath(); x.arc(w * 0.38, hh / 2, hh * 0.25, 0, Math.PI * 2); x.fill();
+          x.fillStyle = '#e30a17'; x.beginPath(); x.arc(w * 0.42, hh / 2, hh * 0.2, 0, Math.PI * 2); x.fill();
+          x.fillStyle = '#fff'; x.beginPath();
+          for (let i = 0; i < 10; i++) {
+            const a = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? hh * 0.05 : hh * 0.12;
+            x.lineTo(w * 0.6 + Math.cos(a) * r, hh / 2 + Math.sin(a) * r);
+          }
+          x.closePath(); x.fill();
+        }),
+      }));
+      bayrak.position.copy(h.p).addScaledVector(h.n, -0.006);
+      bayrak.lookAt(h.p.clone().add(h.n));
+      arac.add(bayrak);
+    }
+  }
+  // dışarıdan erişilen acil durdurma (sağ yanda, kapının arkasında)
+  {
+    const h = yuzey(V(-0.66, 0.6, 2), V(0, 0, -1));
+    if (h) lib.acilStop(arac, h.p.x, h.p.y, h.p.z + 0.035, 0);
+  }
 
-  // tekerler (20"): arka sağda göbek motoru
-  const R = 0.25;
-  const gLas = new THREE.TorusGeometry(R - 0.025, 0.025, 8, 36), gJ = new THREE.TorusGeometry(R - 0.05, 0.01, 6, 36);
-  function teker(motorlu) {
+  // ---------------------------------------------------------------- iç donanım (camdan, kapıdan ve kapaktan görünür)
+  const siyahKoltuk = mat(0x17181a, { r: 0.8, key: 'ea-koltuk' });
+  box(0.42, 0.06, 0.42, siyahKoltuk, -0.3, 0.22, 0, arac).rotation.z = -0.05;    // yarış koltuğu
+  box(0.06, 0.58, 0.44, siyahKoltuk, -0.52, 0.5, 0, arac).rotation.z = 0.36;      // yatık sırtlık
+  for (const sg of [1, -1]) {
+    box(0.4, 0.1, 0.05, siyahKoltuk, -0.32, 0.28, sg * 0.21, arac);
+    box(0.08, 0.45, 0.06, siyahKoltuk, -0.5, 0.52, sg * 0.21, arac).rotation.z = 0.36;
+  }
+  for (const sg of [1, -1]) {   // alüminyum devrilme kafesi: arka çember + ön çapraz boru
+    rod(V(-0.66, 0.16, sg * 0.4), V(-0.66, 0.84, sg * 0.3), 0.016, M.alu, arac, 10);
+    rod(V(0.08, 0.16, sg * 0.4), V(0.05, 0.72, sg * 0.38), 0.014, M.alu, arac, 10);
+    rod(V(-0.66, 0.84, sg * 0.3), V(0.05, 0.72, sg * 0.38), 0.013, M.alu, arac, 10);
+    rod(V(-0.66, 0.16, sg * 0.4), V(0.9, 0.16, sg * 0.3), 0.016, M.alu, arac, 10);   // taban rayı
+  }
+  rod(V(-0.66, 0.85, -0.3), V(-0.66, 0.85, 0.3), 0.016, M.alu, arac, 10);
+  rod(V(0.05, 0.72, -0.38), V(0.05, 0.72, 0.38), 0.014, M.alu, arac, 10);
+  box(0.12, 0.08, 0.7, M.koyu, 0.2, 0.56, 0, arac);                               // gösterge paneli
+  cyl(0.012, 0.3, M.koyu, 0.08, 0.57, 0, arac, { eksen: 'x', seg: 8 }).rotation.z = Math.PI / 2 - 0.5;
+  const dir = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.012, 8, 24), M.siyah);
+  dir.position.set(-0.04, 0.62, 0); dir.rotation.y = Math.PI / 2; dir.rotation.x = 0.55; arac.add(dir);
+  for (const sg of [1, -1]) box(0.03, 0.08, 0.05, M.koyu, 0.62, 0.24, sg * 0.07, arac);   // pedallar
+  const dash = new Ekran(0.13, 0.075, 160);
+  dash.mesh.position.set(0.135, 0.62, 0); dash.mesh.rotation.set(0, -Math.PI / 2, 0); dash.mesh.rotateX(-0.35);
+  arac.add(dash.mesh);
+  // kapak altı: pil paketi (turuncu HV kapak), BMS kartı, motor sürücü, HV kabloları
+  const pil = mat(0x2a2e33, { r: 0.6, m: 0.2, key: 'ea-pil' });
+  box(0.38, 0.15, 0.32, pil, 0.86, 0.3, 0, arac);
+  box(0.38, 0.012, 0.32, mat(0xef7d00, { r: 0.6, key: 'ea-hv' }), 0.86, 0.381, 0, arac);
+  box(0.16, 0.025, 0.11, mat(0x1f7a3a, { r: 0.5, key: 'ea-bms' }), 0.84, 0.4, 0.07, arac);
+  for (let i = 0; i < 4; i++) box(0.02, 0.012, 0.02, M.koyu, 0.79 + i * 0.03, 0.418, 0.07, arac);
+  box(0.2, 0.06, 0.13, M.alu, 0.66, 0.27, -0.2, arac);    // motor sürücü (kanatlı)
+  for (let i = -2; i <= 2; i++) box(0.2, 0.018, 0.005, M.alu, 0.66, 0.308, -0.2 + i * 0.022, arac);
+  const hv = mat(0xff6a00, { r: 0.55, key: 'ea-hvkablo' });
+  pipe([V(0.68, 0.3, 0.16), V(0.5, 0.2, 0.3), V(-0.2, 0.18, 0.36), V(-0.7, 0.2, 0.4), V(RA + 0.1, R, 0.44)], 0.011, hv, arac);
+  pipe([V(0.7, 0.27, -0.13), V(0.75, 0.3, -0.02)], 0.009, hv, arac);
+  box(0.1, 0.05, 0.08, M.siyah, -1.0, 0.24, -0.12, arac);   // telemetri modülü + anten
+  rod(V(-1.0, 0.27, -0.12), V(-1.0, 0.5, -0.12), 0.003, M.koyu, arac, 5);
+
+  // tekerler: siyah lastik, gümüş çok kollu jant; arka sağda göbek motoru
+  const gLas = new THREE.LatheGeometry([[0.16, -0.062], [0.232, -0.066], [0.254, -0.05], [0.26, 0], [0.254, 0.05], [0.232, 0.066], [0.16, 0.062]]
+    .map(([r, y]) => new THREE.Vector2(r, y)), 36);
+  gLas.rotateX(Math.PI / 2);
+  const jant = mat(0xd5d9dd, { r: 0.28, m: 0.85, key: 'ea-jant' });
+  function teker(motorlu, sg) {
     const w = new THREE.Group();
-    w.add(new THREE.Mesh(gLas, M.kaucuk), new THREE.Mesh(gJ, alu));
-    w.children.forEach((c) => (c.castShadow = true));
-    if (!motorlu) cyl(R - 0.06, 0.012, mat(0xd8dde2, { r: 0.3, m: 0.6, key: 'ea-disk' }), 0, 0, 0, w, { eksen: 'z', seg: 28 });   // aero jant kapağı (motorlu tekerde motor görünsün)
-    else for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; rod(V(Math.cos(a) * 0.1, Math.sin(a) * 0.1, 0), V(Math.cos(a) * (R - 0.055), Math.sin(a) * (R - 0.055), 0), 0.003, M.celik, w, 4); }
-    if (motorlu) { cyl(0.11, 0.07, M.koyu, 0, 0, 0, w, { eksen: 'z', seg: 26 }); cyl(0.07, 0.074, alu, 0, 0, 0, w, { eksen: 'z', seg: 20 }); }
-    else cyl(0.03, 0.06, alu, 0, 0, 0, w, { eksen: 'z', seg: 12 });
-    box(0.03, 0.02, 0.005, M.koyu, R - 0.12, 0, 0.007, w);   // dönüş görünsün diye jant işareti
+    const las = new THREE.Mesh(gLas, M.kaucuk); las.castShadow = true; w.add(las);
+    cyl(0.158, 0.11, jant, 0, 0, 0, w, { eksen: 'z', seg: 28, acik: true });
+    cyl(0.035, 0.12, jant, 0, 0, 0, w, { eksen: 'z', seg: 12 });
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const k = box(0.12, 0.018, 0.012, jant, Math.cos(a) * 0.095, Math.sin(a) * 0.095, sg * 0.045, w);
+      k.rotation.z = a;
+    }
+    if (motorlu) { cyl(0.1, 0.075, M.koyu, 0, 0, 0, w, { eksen: 'z', seg: 26 }); cyl(0.06, 0.08, M.alu, 0, 0, 0, w, { eksen: 'z', seg: 18 }); }
+    box(0.03, 0.02, 0.005, M.koyu, 0.13, 0, sg * 0.056, w);   // dönüş görünsün diye jant işareti
     lib.sabitle(w);
     return w;
   }
+  // davlumbaz içi (koyu yarım silindir: kesilen kabuğun ardı boş görünmesin)
+  const gIc = new THREE.CylinderGeometry(DAVLUMBAZ + 0.005, DAVLUMBAZ + 0.005, 0.2, 22, 1, true, -Math.PI / 2, Math.PI);
+  gIc.rotateX(-Math.PI / 2);
+  const icKoyu = new THREE.MeshStandardMaterial({ color: 0x17191c, roughness: 0.95, side: THREE.DoubleSide });
+  for (const ax of [FA, RA]) for (const sg of [1, -1]) { const o = new THREE.Mesh(gIc, icKoyu); o.position.set(ax, R, sg * 0.5); arac.add(o); }
   const tekerler = [];
-  for (const [x, z, mt] of [[FA, 0.53, false], [FA, -0.53, false], [RA, 0.42, true], [RA, -0.42, false]]) {
-    const w = teker(mt); w.position.set(x, R, z); arac.add(w); tekerler.push({ w, arka: x < 0 });
+  for (const [x, z, mt] of [[FA, IZ, false], [FA, -IZ, false], [RA, IZ, true], [RA, -IZ, false]]) {
+    const w = teker(mt, Math.sign(z)); w.position.set(x, R, z); arac.add(w); tekerler.push({ w, arka: x < 0 });
   }
 
   // ---------------------------------------------------------------- soğutma fanı, kontrol masası, tabela
@@ -156,10 +453,10 @@ export function create(lib) {
   const dynoPano = new THREE.Group(); g.add(dynoPano);
   lib.pano(dynoPano, -3.6, 0, -1.5, 0.8, 1.6, 0.4, Math.PI / 2);
   const kule = lib.kuleLambasi(g, -3.6, 1.6, -1.5);
-  const tabela = levha(['ÜNİVERSİTE ELEKTRİKLİ ARAÇ PROJESİ', 'temsili model · verimlilik yarışı aracı · şasi dinamometresi'], 3.4, 0.5, { bg: '#17324f', font: 62, px: 1200 });
+  const tabela = levha(['MAVERA · ELEKTRİKLİ ARAÇ', 'TÜBİTAK Efficiency Challenge · üniversite takımı · şasi dinamometresi'], 3.6, 0.5, { bg: '#17324f', font: 62, px: 1300 });
   tabela.position.set(CX, 2.6, CZ - 1.9);
   g.add(tabela);
-  for (const s of [-1, 1]) rod(V(CX + s * 1.5, 0, CZ - 1.9), V(CX + s * 1.5, 2.85, CZ - 1.9), 0.025, M.koyu, g, 8);
+  for (const s of [-1, 1]) rod(V(CX + s * 1.6, 0, CZ - 1.9), V(CX + s * 1.6, 2.85, CZ - 1.9), 0.025, M.koyu, g, 8);
   // takım dolabı + şarj arabası
   box(0.7, 0.9, 0.45, M.kirmizi, 3.5, 0.45, -2.0, g);
   for (let i = 0; i < 4; i++) box(0.66, 0.012, 0.01, M.koyu, 3.5, 0.2 + i * 0.2, -1.77, g);
@@ -170,11 +467,21 @@ export function create(lib) {
   const op = lib.operator({ logo: false, yelek: 0x2a6fdb, gomlek: 0x1b1f27 });
   g.add(op.group);
   const MASA = [DX, DZ + 0.62];
-  const opS = { x: MASA[0], z: MASA[1], yon: Math.PI, hx: MASA[0], hz: MASA[1], hyon: Math.PI, poz: 'on' };
+  const opS = { x: MASA[0], z: MASA[1], yon: Math.PI, hx: MASA[0], hz: MASA[1], hyon: Math.PI, poz: 'on', rota: [] };
   const opHedef = (x, z, yon, poz = 'on') => { opS.hx = x; opS.hz = z; opS.hyon = yon; opS.poz = poz; };
-  const opVardi = () => Math.hypot(opS.hx - opS.x, opS.hz - opS.z) < 0.03;
+  const opRota = (noktalar, yon, poz = 'on') => {   // ara noktalar sırayla, sonuncusu hedef
+    opS.rota = noktalar.slice(0, -1).map((n) => n.slice());
+    const [x, z] = noktalar[noktalar.length - 1];
+    opHedef(x, z, yon, poz);
+  };
+  const opVardi = () => !opS.rota.length && Math.hypot(opS.hx - opS.x, opS.hz - opS.z) < 0.03;
   function opGuncelle(dt, t) {
-    const dx = opS.hx - opS.x, dz = opS.hz - opS.z, d = Math.hypot(dx, dz);
+    let tx = opS.hx, tz = opS.hz;
+    if (opS.rota.length) {
+      [tx, tz] = opS.rota[0];
+      if (Math.hypot(tx - opS.x, tz - opS.z) < 0.06) { opS.rota.shift(); [tx, tz] = opS.rota.length ? opS.rota[0] : [opS.hx, opS.hz]; }
+    }
+    const dx = tx - opS.x, dz = tz - opS.z, d = Math.hypot(dx, dz);
     const yuruyor = d > 0.02;
     let hy = opS.hyon;
     if (yuruyor) { const s = Math.min(d, 1.25 * dt); opS.x += (dx / d) * s; opS.z += (dz / d) * s; hy = Math.atan2(dx, dz); }
@@ -186,12 +493,11 @@ export function create(lib) {
   }
 
   // ---------------------------------------------------------------- dyno / araç modeli
-  // m = 150 kg (araç ≈ 85 + sürücü ≈ 65), Crr 0.0055, CdA 0.13 m², motor+sürücü verimi %88, rejen %60.
-  const KTL = 150, CRR = 0.0055, CDA = 0.13, ETA = 0.88;
+  // m = 150 kg (araç + sürücü), Crr 0.0055, kapalı gövde CdA ≈ 0.30 m², motor+sürücü verimi %88, rejen %60.
+  const KTL = 150, CRR = 0.0055, CDA = 0.3, ETA = 0.88;
   const PIL_WH = 1024;   // 16S LiFePO4 51.2 V 20 Ah (temsili)
   const PROF = { sabit: 'Sabit hız', parkur: 'Yarış parkuru döngüsü', rejen: 'Rejeneratif fren testi' };
   let profil = 'parkur', test = false, hedefHiz = 30, fanAcik = true, kill = false, demo = true, demoT = 0, demoAdim = 0;
-  let kabukAcik = false, kabukK = 0, kabukIs = null;   // kabukIs: hedef durum (operatör yürüyüp kaldırır)
   let v = 0, a = 0, pMek = 0, pEl = 0, soc = 0.9, sicaklik = 27, profT = 0, mesafe = 0, enerji = 0;
   let volt = 52, akim = 0, rpm = 0, tork = 0;
   const parkurHiz = (t) => {   // 40 s döngü (km/h)
@@ -210,7 +516,7 @@ export function create(lib) {
     const hedef = kill || !test ? 0 : profil === 'sabit' ? hedefHiz : profil === 'parkur' ? parkurHiz(profT) : rejenHiz(profT);
     if (test && !kill) profT += dt;
     const v0 = v;
-    const amax = profil === 'rejen' && hedef < v ? 1.6 : 1.2;   // km/h/s ölçeğinde değil: m/s²
+    const amax = profil === 'rejen' && hedef < v ? 1.6 : 1.2;   // m/s²
     v = approach(v, hedef, amax * 3.6 * dt);
     if (kill) v = approach(v0, 0, 2.5 * 3.6 * dt);
     a = (v - v0) / 3.6 / Math.max(dt, 1e-4);
@@ -234,24 +540,40 @@ export function create(lib) {
   const ekranZ = throttle(4), dashZ = throttle(4);
   const verim = () => (v > 3 ? pEl / v : 0);   // Wh/km
 
-  function kabukGuncelle(dt) {
-    if (kabukIs !== null) {
-      // operatör burna yürür, kabuğu kaldırır/indirir, masaya döner
-      if (kabukIs.faz === 0) { opHedef(CX + 1.7, CZ + 0.75, -Math.PI * 0.6); if (opVardi()) kabukIs.faz = 1; }
-      else if (kabukIs.faz === 1) {
-        opS.poz = 'yukari';
-        kabukK = approach(kabukK, kabukIs.hedef ? 1 : 0, dt / 2.2);
-        if (kabukK === (kabukIs.hedef ? 1 : 0)) { kabukAcik = kabukIs.hedef; kabukIs = null; }
-      }
+  // kapı / kapak işleri: operatör yürür, kaldırır/indirir, masaya döner (kuyrukta sırayla)
+  let kapiK = 0, kapakK = 0, isler = [];
+  const IS_YER = {
+    kapi: { rota: [[CX - 1.0, CZ + 1.0]], yon: 2.03 },                          // kapının arkasında (kamerayı kapatmaz)
+    kapak: { rota: [[CX + 1.82, CZ + 1.2], [CX + 1.82, CZ - 0.55]], yon: -1.08 },   // burnun arka köşesinde (kamerayı kapatmaz)
+  };
+  const isEkle = (tip, hedef) => { isler.push({ tip, hedef, faz: 0, r: false }); };
+  const isAcik = (tip) => { const son = [...isler].reverse().find((i) => i.tip === tip); return son ? son.hedef : (tip === 'kapi' ? kapiK : kapakK) > 0.5; };
+  function isGuncelle(dt) {
+    const is = isler[0];
+    if (!is) return;   // hedef zaten masa (iş bitince dönüş rotası verilir)
+    const Y = IS_YER[is.tip];
+    if (is.faz === 0) {
+      if (!is.r) { opRota(Y.rota, Y.yon, 'on'); is.r = true; }
+      if (opVardi()) is.faz = 1;
+    } else if (is.faz === 1) {
+      opS.poz = 'yukari';
+      const hedef = is.hedef ? 1 : 0;
+      if (is.tip === 'kapi') kapiK = approach(kapiK, hedef, dt / 2.0); else kapakK = approach(kapakK, hedef, dt / 1.6);
+      if ((is.tip === 'kapi' ? kapiK : kapakK) === hedef) { is.faz = 2; is.r = false; }
+    } else {
+      // sıradaki iş varsa doğrudan ona, yoksa masaya (geri dönüş ara noktaları ters sırada)
+      isler.shift();
+      if (!isler.length) opRota([...Y.rota.slice(0, -1).reverse(), MASA], Math.PI, 'on');
     }
-    kabuk.rotation.z = easeInOut(kabukK) * 0.95;
   }
 
   function demoGuncelle(dt) {
     demoT += dt;
     const sira = [
-      () => { kabukIs = { hedef: true, faz: 0 }; return 12; },          // kabuğu aç, iç donanım
-      () => { kabukIs = { hedef: false, faz: 0 }; return 7; },
+      () => { isEkle('kapak', true); return 12; },                       // servis kapağı: pil, BMS, sürücü
+      () => { isEkle('kapak', false); return 6; },
+      () => { isEkle('kapi', true); return 9; },                         // makas kapı: koltuk, kafes
+      () => { isEkle('kapi', false); return 9; },
       () => { profil = 'parkur'; profT = 0; test = true; return 42; },   // parkur döngüsü
       () => { test = false; return 5; },
       () => { profil = 'rejen'; profT = 0; test = true; return 30; },
@@ -263,19 +585,26 @@ export function create(lib) {
   function update(dt, t) {
     if (demo && !kill) demoGuncelle(dt);
     fizik(dt);
-    kabukGuncelle(dt);
+    isGuncelle(dt);
+    const kk = easeInOut(kapiK);
+    kapiPivot.rotation.z = -1.3 * kk;           // yukarı (menteşe önde: arka uç kalkar)
+    kapiKol.rotation.y = 0.14 * kk;             // önce dışa
+    kapiPivot.position.z = KAPI_M.z + 0.04 * kk;
+    kapakPivot.rotation.z = 1.05 * easeInOut(kapakK);
     // tekerler + makaralar + fan
     const wv = (v / 3.6 / R) * dt;
     for (const tk of tekerler) if (tk.arka) tk.w.rotation.z -= wv;
     for (const m of makaralar) m.rotation.y += (v / 3.6 / 0.085) * dt;   // eksen z'ye yatık silindir: yerel Y
     if (fanAcik) fan.rotation.x += dt * 14;
-    if (kabukIs === null) opHedef(MASA[0], MASA[1], Math.PI, 'on');
+    // ışıklar: testte ön ledler yanar; yavaşlarken / KILL'de stop
+    ledOn.emissiveIntensity = test ? 2.2 : 0.25;
+    ledArka.emissiveIntensity = kill || (v > 1 && a < -0.25) ? 2.8 : test ? 0.7 : 0.25;
     opGuncelle(dt, t);
     const d = durumBilgi();
     kule.set(d.seviye, t);
     trend.ornekle(dt, [v, pEl / 10, sicaklik]);
     if (ekranZ(dt)) {
-      ekran.standart('Şasi Dinamometresi', [
+      ekran.standart('MAVERA · Şasi Dinamometresi', [
         ['Profil', test ? PROF[profil] : 'beklemede'],
         ['Hız', `${fmt(v, 1)} km/h`],
         ['Güç / tork', `${fmt(pEl, 0)} W · ${fmt(tork, 1)} Nm`],
@@ -299,17 +628,18 @@ export function create(lib) {
 
   function durumBilgi() {
     if (kill) return { metin: 'KILL SWITCH · HV KESİK', seviye: 'alarm' };
-    if (kabukIs) return { metin: kabukIs.hedef ? 'KABUK AÇILIYOR' : 'KABUK KAPANIYOR', seviye: 'calisiyor' };
+    const is = isler[0];
+    if (is) return { metin: `${is.tip === 'kapi' ? 'MAKAS KAPI' : 'SERVİS KAPAĞI'} ${is.hedef ? 'AÇILIYOR' : 'KAPANIYOR'}`, seviye: 'calisiyor' };
     if (test && sicaklik > 42) return { metin: `PİL SICAKLIĞI YÜKSEK · ${fmt(sicaklik, 0)} °C`, seviye: 'uyari' };
     if (test) return { metin: `DYNO · ${PROF[profil]} · ${fmt(v, 0)} km/h · ${fmt(pEl, 0)} W`, seviye: 'calisiyor' };
     if (soc < 0.1) return { metin: 'PİL ZAYIF', seviye: 'uyari' };
-    return { metin: `HAZIR · kabuk ${kabukAcik ? 'açık' : 'kapalı'}`, seviye: 'bekliyor' };
+    return { metin: `HAZIR · kapı ${kapiK > 0.5 ? 'açık' : 'kapalı'} · kapak ${kapakK > 0.5 ? 'açık' : 'kapalı'}`, seviye: 'bekliyor' };
   }
 
   const elle = () => { demo = false; };
   const kontroller = [
-    { tip: 'anahtar', metin: 'Kabuk açık (iç donanımı göster)', get: () => (kabukIs ? kabukIs.hedef : kabukAcik),
-      set: (vv) => { elle(); kabukIs = { hedef: !!vv, faz: 0 }; } },
+    { tip: 'anahtar', metin: 'Makas kapı açık', get: () => isAcik('kapi'), set: (vv) => { elle(); isEkle('kapi', !!vv); } },
+    { tip: 'anahtar', metin: 'Servis kapağı açık (pil, BMS, sürücü)', get: () => isAcik('kapak'), set: (vv) => { elle(); isEkle('kapak', !!vv); } },
     { tip: 'secim', metin: 'Test profili', secenekler: Object.entries(PROF), get: () => profil, set: (vv) => { profil = vv; profT = 0; elle(); } },
     { tip: 'butonlar', ogeler: [
       { metin: 'Dyno başlat', tur: 'basla', tik: () => { if (!kill) { test = true; profT = 0; } elle(); } },
@@ -318,7 +648,7 @@ export function create(lib) {
     ] },
     { tip: 'kaydirici', metin: 'Hız hedefi (sabit profil)', min: 0, max: 45, adim: 1, birim: 'km/h', get: () => hedefHiz, set: (vv) => (hedefHiz = vv) },
     { tip: 'anahtar', metin: 'Soğutma fanı', get: () => fanAcik, set: (vv) => (fanAcik = vv) },
-    { tip: 'anahtar', metin: 'Otomatik demo (kabuk → parkur → rejen)', get: () => demo, set: (vv) => { demo = vv; demoT = 0; demoGuncelle.sure = 0; } },
+    { tip: 'anahtar', metin: 'Otomatik demo (kapak → kapı → parkur → rejen)', get: () => demo, set: (vv) => { demo = vv; demoT = 0; demoGuncelle.sure = 0; } },
     { tip: 'baslik', metin: 'Güvenlik' },
     { tip: 'butonlar', ogeler: [
       { metin: 'KILL SWITCH', tur: 'acil', tik: () => { kill = true; test = false; elle(); } },
@@ -328,28 +658,30 @@ export function create(lib) {
 
   return {
     id: 'earac',
-    ad: 'Üniversite Elektrikli Araç Projesi',
-    altBaslik: 'Temsili · verimlilik aracı · dyno',
-    kisa: 'Üniversitede elektrikli araç proje ekibinde yer aldım; bu istasyon o projenin temsili modeli: tek kişilik aerodinamik verimlilik aracı şasi dinamometresinde. Kabuğu açıp pil paketi, BMS, motor sürücü ve göbek motorunu görebilir; sabit hız, yarış parkuru ve rejeneratif fren testlerinde hız, güç, verim (Wh/km) ve pil sıcaklığını izleyebilirsin.',
+    ad: 'MAVERA Elektrikli Araç',
+    altBaslik: 'Efficiency Challenge · 4 teker · dyno',
+    kisa: 'Üniversitede MAVERA takımıyla TÜBİTAK Efficiency Challenge\'a katıldığımız 4 tekerli elektrikli aracın modeli. Gövde takımın fotoğrafındaki araçtan alındı: açık gri kabuk, burundan kuyruğa mavi şerit, yukarı açılan makas kapı, oval yan camlar, ön kaputta servis kapağı. Kapağı açınca pil paketi, BMS ve motor sürücüsü görünür; araç şasi dinamometresinde sabit hız, yarış parkuru ve rejeneratif fren testlerinde hız, güç, verim (Wh/km) ve pil sıcaklığını gösterir.',
     proje: 'personal-projects',
     ayakIzi: [8.4, 5.6],
     ayakIziMerkez: [-0.25, -0.15],
-    kamera: { poz: [2.3, 2.2, 4.6], hedef: [0.0, 0.55, -0.4] },
+    kamera: { poz: [2.8, 1.85, 3.9], hedef: [0.35, 0.55, -0.35] },
     mekanizmalar: [
-      'Üst kabuk kuyruktaki menteşeden kalkar (operatör burundan kaldırır); altta şasi, koltuk, direksiyon, pil, BMS, sürücü, HV kablolar',
-      'Dyno: arka tekerler iki makara üstünde döner, makaralar tekerin tersine; önde soğutma fanı',
+      'Makas kapı: menteşe kapının ön alt köşesinde; kapı önce hafif dışa, sonra yukarı kalkar (operatör yanına gidip kaldırır)',
+      'Servis kapağı: ön cam tarafından menteşeli, burun tarafı kalkar; altında pil paketi (turuncu HV kapak), BMS kartı, motor sürücü',
+      'Dyno: arka tekerler iki makara üstünde döner; önde soğutma fanı; arka sağ tekerde göbek motoru',
       'Profiller: sabit hız (kaydırıcı), 40 s yarış parkuru döngüsü, rejeneratif fren (yavaşlarken güç negatife döner)',
+      'Işıklar: testte ön tampondaki led çizgiler yanar, yavaşlarken stop lambaları parlar',
       'Kokpit ekranı hız/güç/pil gösterir; dyno monitörü ve kule lambası durumla senkron',
-      'KILL SWITCH: HV kesilir, araç makaralarda serbest yavaşlar',
+      'KILL SWITCH: HV kesilir, araç makaralarda serbest yavaşlar (sağ yanda dışarıdan erişilen acil durdurma)',
     ],
     cikarim: [
-      'TEMSİLİ: aracın fotoğrafı ya da ölçüleri yok. CV\'deki "üniversite elektrikli araç proje ekibi üyeliği" bilgisinden yola çıkıldı.',
-      'Üniversite takımlarının yarıştığı verimlilik yarışı tipi tek kişilik araç seçildi: ≈3 m damla gövde, kabarcık kanopi, 20" tekerler, arka tekerde göbek motoru.',
-      'Değerler tipik bir verimlilik aracına göre: 150 kg (sürücü dahil), Crr 0.0055, CdA 0.13 m² → 30 km/h\'de ≈ 120 W, ≈ 4 Wh/km; pil 16S LiFePO4 51.2 V 20 Ah.',
-      'Pil tüketimi gösterim için ×10 hızlandırıldı.',
+      'Kaan\'dan: MAVERA takımı, TÜBİTAK Efficiency Challenge, 4 teker.',
+      'Gövde takımın araç fotoğrafından: astar gri kabuk, ortadan mavi şerit, siyah çerçeveli ön cam, oval yan camlar, makas kapı, çamurluk üstü aynalar, mandallı ön servis kapağı, ön tamponda üçer led çizgi, arka kanat, camda bayrak çıkartması.',
+      'Ölçüler fotoğraftan tahmin: ≈2.7 m boy, ≈1.3 m en, ≈1.05 m yükseklik, 1.75 m dingil mesafesi. Fotoğraftaki sponsor logoları konmadı; kapakta takım adı var.',
+      'Kapak altındaki yerleşim, motorun yeri ve sayısal değerler temsili: 150 kg (sürücü dahil), Crr 0.0055, CdA ≈ 0.30 m² → 30 km/h\'de ≈ 190 W; pil 16S LiFePO4 51.2 V 20 Ah. Pil tüketimi gösterim için ×10 hızlandırıldı.',
     ],
     group: g,
-    sabitHaric: [kabuk, ...tekerler.map((t) => t.w), ...makaralar, fan, op.group],
+    sabitHaric: [kapiPivot, kapakPivot, ...tekerler.map((t) => t.w), ...makaralar, fan, op.group],
     update,
     kontroller,
     degerler: () => [
@@ -361,7 +693,7 @@ export function create(lib) {
       ['Pil', `${fmt(volt, 1)} V · ${fmt(akim, 1)} A · %${fmt(soc * 100, 0)}`],
       ['Pil sıcaklığı', `${fmt(sicaklik, 1)} °C`],
       ['Test sayacı', `${fmt(mesafe, 2)} km · ${fmt(enerji, 1)} Wh`],
-      ['Kabuk', kabukAcik ? 'açık' : 'kapalı'],
+      ['Kapı / servis kapağı', `${kapiK > 0.5 ? 'açık' : 'kapalı'} / ${kapakK > 0.5 ? 'açık' : 'kapalı'}`],
     ],
     trend,
     durum: durumBilgi,

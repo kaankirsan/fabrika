@@ -236,7 +236,7 @@ export function create(lib) {
       x.fillStyle = renk; x.strokeStyle = renk; fn();
     };
     x.save(); x.translate(w, 0); x.scale(-1, 1);                 // klişede yazılar aynalı
-    kabart(() => { x.font = `800 ${Math.round(h * 0.17)}px "Space Grotesk", sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('DOKA AMBALAJ', w / 2, h * 0.2); });
+    kabart(() => { lib.dokaLogo(x, w / 2, h * 0.2, h * 0.2, x.fillStyle); x.textBaseline = 'middle'; });   // resmi doka logosu (kabartma rengiyle)
     kabart(() => { x.font = `600 ${Math.round(h * 0.06)}px "Space Grotesk", sans-serif`; x.textAlign = 'left'; x.fillText('Net 500 g · Son kul. 12/2027', w * 0.08, h * 0.88); });
     kabart(() => { x.lineWidth = h * 0.03; x.beginPath(); x.arc(w * 0.76, h * 0.56, h * 0.15, 0, Math.PI * 2); x.stroke();
       x.font = `800 ${Math.round(h * 0.1)}px "Space Grotesk", sans-serif`; x.textAlign = 'center'; x.fillText('%100', w * 0.76, h * 0.57); });
@@ -725,7 +725,7 @@ export function create(lib) {
     yaz('Fi', 32, 38, 30, '#fff', 800);
     yaz('TEKNİK', 60, 28, 18, '#ef7d00', 800, 'left'); yaz('TASARIM', 60, 50, 15, '#ef7d00', 700, 'left');
     x.fillStyle = '#151515'; x.fillRect(Wp - 150, 12, 138, 48);
-    yaz('⊐<  doka', Wp - 81, 36, 22, '#fff', 600);
+    lib.dokaLogo(x, Wp - 81, 36, 36, '#fff');
     yaz('KLİŞE YIKAMA', Wp / 2 - 10, 24, 22, '#222', 800);
     // adım kutusu
     const adimRenk = { yikama: '#1f6fd6', durulama: '#39a0d8', kurutma: '#8a8f96', bitti: '#2ea043', hazir: '#ef7d00' }[faz];

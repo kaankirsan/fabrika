@@ -449,7 +449,7 @@ function etiketSprite(no, ad) {
 // ------------------------------------------------------------------ makineler
 const makineler = []; // {m, yer, no, kok, etiket}
 async function makineleriYukle() {
-  await document.fonts.ready.catch(() => {});
+  await Promise.all([document.fonts.ready.catch(() => {}), lib.dokaLogoHazir]);   // tuval yazıları + doka logosu
   await Promise.all(YERLESIM.map(async (yer, i) => {
     const no = i + 1;
     const kok = new THREE.Group();

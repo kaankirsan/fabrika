@@ -244,15 +244,10 @@ export function create(lib) {
     for (const xh of [0.25, -0.07]) kutu(0.04, 0.085, 0.04, kMat, xh, TOP + 0.04, zh);
     if (ek) kutu(0.3, 0.02, 0.03, inoxMat, 0.09, TOP + 0.012, 0.63);        // yan paslanmaz lama
   }
-  // ayrı "DK doka" logo levhası (tabla üstünde)
-  const dkLogoTex = lib.canvasTex(256, 96, (x, w, h) => {
+  // ayrı doka logo levhası (tabla üstünde; beyaz levhada siyah resmi logo)
+  const dkLogoTex = lib.canvasTex(512, 192, (x, w, h) => {
     x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
-    x.fillStyle = '#111'; x.fillRect(0, 0, 92, h);
-    x.strokeStyle = '#fff'; x.lineWidth = 7;
-    x.beginPath(); x.moveTo(22, 26); x.lineTo(44, 26); x.arc(44, 48, 22, -Math.PI / 2, Math.PI / 2); x.lineTo(22, 70); x.stroke();
-    x.beginPath(); x.moveTo(80, 26); x.lineTo(56, 48); x.lineTo(80, 70); x.stroke();
-    x.fillStyle = '#111'; x.font = '600 52px "Space Grotesk", sans-serif'; x.textBaseline = 'middle';
-    x.fillText('doka', 108, h / 2 + 2);
+    lib.dokaLogo(x, w / 2, h / 2, 146, '#111');
   });
   const levhaMat = new THREE.MeshStandardMaterial({ map: dkLogoTex, roughness: 0.5 });
   const logoLevha = new THREE.Mesh(new THREE.PlaneGeometry(0.25, 0.09), levhaMat);
@@ -265,9 +260,9 @@ export function create(lib) {
     x.strokeStyle = '#8c9096'; x.lineWidth = 6; x.strokeRect(3, 3, w - 6, h - 6);
     // doku: sol = kumanda ucu (-Z), üst = siyah ön yüz (-X); butonların sarı etiketleri arka-solda
     x.fillStyle = '#e9c21a'; x.fillRect(16, 150, 14, 40); x.fillRect(16, 222, 14, 40);
-    // "DK doka" logo bloğu (sağ-orta) + QR (sağ-ön)
-    x.fillStyle = '#111'; x.fillRect(198, 110, 46, 120); x.fillStyle = '#fff'; x.fillRect(244, 110, 46, 120);
-    x.fillStyle = '#111'; x.font = '600 26px "Space Grotesk", sans-serif'; x.save(); x.translate(274, 170); x.rotate(-Math.PI / 2); x.textAlign = 'center'; x.fillText('doka', 0, 8); x.restore();
+    // doka logo bloğu (sağ-orta, beyaz zeminde dikey resmi logo) + QR (sağ-ön)
+    x.fillStyle = '#fff'; x.fillRect(222, 106, 48, 128);
+    x.save(); x.translate(246, 170); x.rotate(-Math.PI / 2); lib.dokaLogo(x, 0, 0, 34, '#111'); x.restore();
     for (let i = 0; i < 9; i++) for (let j = 0; j < 9; j++) if ((i * 7 + j * 13 + i * j) % 3 === 0) { x.fillStyle = '#111'; x.fillRect(262 + j * 7, 22 + i * 7, 7, 7); }
   });
   const kontMats = [deckMat, deckMat, new THREE.MeshStandardMaterial({ map: kontTex, roughness: 0.5, metalness: 0.2 }), deckMat, deckMat, deckMat];
@@ -340,12 +335,8 @@ export function create(lib) {
   const lc = document.createElement('canvas'); lc.width = 512; lc.height = 360;
   const lctx = lc.getContext('2d');
   lctx.fillStyle = '#ffffff'; lctx.fillRect(0,0,512,360);
-  lctx.strokeStyle = '#0a1530'; lctx.lineWidth = 10; lctx.strokeRect(8,8,496,344);
-  lctx.fillStyle = '#0a1530'; lctx.font = 'bold 140px Arial Black, Arial'; lctx.textAlign = 'center';
-  lctx.fillText('DOKA', 256, 200);
-  lctx.font = 'bold 44px Arial'; lctx.fillStyle = '#1c3a78';
-  lctx.fillText('MÜHENDİSLİK', 256, 260);
-  lctx.fillStyle = '#d97757'; lctx.fillRect(140, 290, 232, 6);
+  lctx.strokeStyle = '#141414'; lctx.lineWidth = 8; lctx.strokeRect(8,8,496,344);
+  lib.dokaLogo(lctx, 256, 180, 134, '#141414');                // resmi doka logosu
   const logoTex = new THREE.CanvasTexture(lc);
   logoTex.colorSpace = THREE.SRGBColorSpace;
   const logoMat = new THREE.MeshStandardMaterial({ map: logoTex, roughness: 0.7, emissive: 0xffffff, emissiveMap: logoTex, emissiveIntensity: 0.25 });

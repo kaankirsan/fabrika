@@ -496,8 +496,8 @@ export function create(lib) {
   function presHmi(x, W, H) {
     x.fillStyle = '#cfd9e4'; x.fillRect(0, 0, W, H);
     x.fillStyle = '#111'; x.fillRect(10, 10, 120, 40);
-    x.fillStyle = '#fff'; x.font = '700 22px "Space Grotesk", sans-serif'; x.textBaseline = 'middle'; x.textAlign = 'left';
-    x.fillText('⊐< doka', 20, 31);
+    lib.dokaLogo(x, 70, 30, 30, '#fff');
+    x.textBaseline = 'middle';
     const ok = durum === 'calisiyor';
     x.fillStyle = ok ? '#30b94a' : durum === 'durdu' ? '#8a96a3' : '#e0402a';
     x.beginPath(); x.roundRect(W / 2 - 60, 16, 120, 28, 8); x.fill();

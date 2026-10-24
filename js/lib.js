@@ -488,6 +488,55 @@ export function canvasTex(w, h, ciz, { tekrar = null, srgb = true } = {}) {
   return t;
 }
 
+// ------------------------------------------------------------------ doka logosu
+// Firmanın resmi logosu (img/doka-logo.png, Kaan'ın verdiği görselden): beyaz + saydam maske —
+// solda yuvarlak köşeli kutu (içinde boşluk olarak "⊃<" işareti), sağda "doka". "DOKA" yazan
+// her yerde metin yerine bu çizilir. dokaLogo() maskeyi istenen renge boyar: koyu zeminde
+// beyaz, açık zeminde siyah (işaret zemin renginde kalır). main.js makineleri kurmadan önce
+// dokaLogoHazir'ı bekler; görsel yüklenemezse aynı ölçülerde basit vektör çizilir.
+const _logo = new Image();
+export const dokaLogoHazir = new Promise((r) => { _logo.onload = r; _logo.onerror = r; });
+_logo.src = new URL('../img/doka-logo.png', import.meta.url).href;
+const LOGO_ORAN = 1662 / 516, LOGO_ISARET = 0.4589;   // genişlik/yükseklik, kutunun genişlik payı
+const _logoBoya = new Map();
+// x: 2D bağlam, (cx, cy) merkez, h yükseklik (px), renk; isaret: true → yalnız kutu (⊃<).
+// Dönüş: çizilen genişlik.
+export function dokaLogo(x, cx, cy, h, renk = '#fff', { isaret = false } = {}) {
+  const pay = isaret ? LOGO_ISARET : 1, w = h * LOGO_ORAN * pay;
+  if (_logo.naturalWidth) {
+    let c = _logoBoya.get(renk);
+    if (!c) {
+      c = document.createElement('canvas');
+      c.width = _logo.naturalWidth; c.height = _logo.naturalHeight;
+      const k = c.getContext('2d');
+      k.drawImage(_logo, 0, 0);
+      k.globalCompositeOperation = 'source-in';
+      k.fillStyle = renk; k.fillRect(0, 0, c.width, c.height);
+      _logoBoya.set(renk, c);
+    }
+    x.drawImage(c, 0, 0, c.width * pay, c.height, cx - w / 2, cy - h / 2, w, h);
+    return w;
+  }
+  // yedek: kutu + işaret boşluğu + yazı (birim = h / 172, kaynak görselin pikseli)
+  const u = h / 172, x0 = cx - w / 2, y0 = cy - h / 2;
+  x.save();
+  x.fillStyle = renk;
+  x.beginPath(); x.roundRect(x0 + 1.4 * u, y0 + 1.3 * u, 251.4 * u, 169 * u, 3.5 * u); x.fill();
+  x.globalCompositeOperation = 'destination-out';
+  x.lineWidth = 15 * u; x.lineCap = 'butt';
+  x.beginPath(); x.moveTo(x0 + 44 * u, y0 + 60 * u); x.lineTo(x0 + 85 * u, y0 + 60 * u);
+  x.arc(x0 + 85 * u, y0 + 92.5 * u, 32.5 * u, -Math.PI / 2, Math.PI / 2); x.lineTo(x0 + 44 * u, y0 + 125 * u); x.stroke();
+  x.beginPath(); x.moveTo(x0 + 204 * u, y0 + 56 * u); x.lineTo(x0 + 143 * u, y0 + 92.5 * u); x.lineTo(x0 + 204 * u, y0 + 129 * u); x.stroke();
+  x.restore();
+  if (!isaret) {
+    x.save(); x.fillStyle = renk; x.textAlign = 'left'; x.textBaseline = 'middle';
+    x.font = `500 ${Math.round(100 * u)}px "Space Grotesk", sans-serif`;
+    x.fillText('doka', x0 + 325 * u, cy + 2 * u);
+    x.restore();
+  }
+  return w;
+}
+
 // Sarı-siyah ikaz şeridi
 export function ikazDokusu(tekrar = [4, 1]) {
   return canvasTex(128, 32, (x, w, h) => {
@@ -774,7 +823,7 @@ export function iz(n = 600, renk = 0x39c5cf, parent = null) {
 
 // ------------------------------------------------------------------ operatör
 // dokamuh.com sahnesindeki (FK-1000) operatörün ortak sürümü: lacivert gömlek, reflektif
-// bantlı ikaz yeleği, sırtta DOKA logosu, baret (siperlik + sırt), açılı kollar, botlar.
+// bantlı ikaz yeleği, sırtta doka logosu, baret (siperlik + sırt), açılı kollar, botlar.
 // Yerel eksen: ayaklar y=0, YÜZ +Z yönüne bakar (makine kodu rotation.y ile çevirir).
 // Seçenekler: yelek (renk), gomlek (renk), baret (renk), kaynakci (baret yerine kaynak
 // maskesi + deri önlük), logo (false = logo yok), kumanda (sağ elde sarı telsiz kumanda).
@@ -784,14 +833,10 @@ export function iz(n = 600, renk = 0x39c5cf, parent = null) {
 let _logoTex = null;
 function operatorLogo() {
   if (_logoTex) return _logoTex;
-  _logoTex = canvasTex(512, 360, (x) => {
+  _logoTex = canvasTex(512, 360, (x) => {         // beyaz yama üstünde siyah doka logosu
     x.fillStyle = '#ffffff'; x.fillRect(0, 0, 512, 360);
-    x.strokeStyle = '#0a1530'; x.lineWidth = 10; x.strokeRect(8, 8, 496, 344);
-    x.fillStyle = '#0a1530'; x.font = 'bold 140px "Arial Black", Arial'; x.textAlign = 'center';
-    x.fillText('DOKA', 256, 200);
-    x.font = 'bold 44px Arial'; x.fillStyle = '#1c3a78';
-    x.fillText('MÜHENDİSLİK', 256, 260);
-    x.fillStyle = '#d97757'; x.fillRect(140, 290, 232, 6);
+    x.strokeStyle = '#141414'; x.lineWidth = 8; x.strokeRect(8, 8, 496, 344);
+    dokaLogo(x, 256, 180, 134, '#141414');
   });
   return _logoTex;
 }

@@ -1,15 +1,15 @@
-// js/machines/solarbot.js — SolarBot: otonom güneş paneli temizleme robotu (DOKA).
+// js/machines/solarbot.js — SolarBot: otonom güneş paneli temizleme robotu (doka).
 //
 // Prototip fotoğraf/videolarından: alçak profilli (~0.7 × 0.7 m) gövde, iki yanda palet,
-// arkada direkte OAK-D derinlik kamerası, önde ve arkada dönen fırça. Kaporta Kaan'ın
-// verdiği referans görsele göre: beyaz gövde + turuncu şeritler, gövdeye bitişik ön/arka
-// fırça kutuları, üstte DOKA plakası.
+// arkada direkte OAK-D derinlik kamerası, önde ve arkada dönen fırça. Kaporta biçimi Kaan'ın
+// verdiği referans görsele göre (gövdeye bitişik ön/arka fırça kutuları); renkler, kayar LED'ler
+// ve siyah fırçalar FK-1000 V3 ile aynı; üstte siyah plakada resmi doka logosu.
 // Burada 25° eğimli bir panel masasının üstünde zikzak (boustrophedon) şeritlerle
 // ilerler; fırçanın geçtiği yerde panel üstündeki toz katmanı silinir.
 
 export function create(lib) {
   const {
-    THREE, M, box, cyl, beam, rod, mat, lamba, canvasTex, Ekran, Trend, kuleLambasi, acilStop,
+    THREE, M, box, cyl, sphere, beam, rod, mat, lamba, canvasTex, Ekran, Trend, kuleLambasi, acilStop,
     clamp, approach, fmt, throttle, gurultu,
   } = lib;
 
@@ -133,18 +133,19 @@ export function create(lib) {
   }
 
   // ---------------------------------------------------------------- robot
-  // Kaporta Kaan'ın verdiği referansa göre: beyaz gövde + turuncu şeritler, gövdeye bitişik ön ve
-  // arka fırça kutusu (beyaz kapak, gri bant, turuncu etek, altta beyaz kıllar), üstte DOKA plakası,
-  // arkada kamera direği. Robot yerel ekseni: +x ileri, y yukarı, z yan.
+  // Kaporta biçimi Kaan'ın verdiği referansa göre (gövdeye bitişik ön/arka fırça kutusu, arkada
+  // kamera direği); renkler ve LED'ler FK-1000 V3 ile aynı: gri tabla, paslanmaz ray, siyah bant
+  // ve fırçalar, üstte kayan kırmızı-turuncu LED şeritleri, mavi kenar sensörleri, siyah plakada
+  // doka logosu. Robot yerel ekseni: +x ileri, y yukarı, z yan (−z sol).
   const robot = new THREE.Group();
   robot.name = 'solarbotRobot';
   yuzey.add(robot);
   const RY = 0.004;
-  const beyaz = mat(0xeeeeea, { r: 0.36, m: 0.05, key: 'sbBeyaz' });
-  const turuncu = mat(0xf0601e, { r: 0.42, m: 0.05, key: 'sbTuruncu' });
-  const griBant = mat(0xa3a9ae, { r: 0.4, m: 0.3, key: 'sbGri' });
+  const gri = mat(0xa9adb2, { r: 0.55, m: 0.35, key: 'sbTabla' });     // FK-1000 deckMat
+  const inox = mat(0xc9ced3, { r: 0.28, m: 0.9, key: 'sbInox' });      // FK-1000 inoxMat
+  const siyah = mat(0x18191c, { r: 0.8, m: 0.1, key: 'sbSiyah' });     // FK-1000 kMat
   const kabuk = (geo) => {   // ExtrudeGeometry parçaları (robot.add + gölge)
-    const m = new THREE.Mesh(geo, beyaz);
+    const m = new THREE.Mesh(geo, gri);
     m.castShadow = m.receiveShadow = true;
     robot.add(m);
     return m;
@@ -172,32 +173,35 @@ export function create(lib) {
     gg.translate(0, RY, -0.31);
     kabuk(gg);
   }
-  for (const sx of [-1, 1]) box(0.012, 0.02, 0.6, turuncu, sx * 0.338, RY + 0.065, 0, robot);   // gövde alt turuncu şerit
+  for (const sx of [-1, 1]) box(0.014, 0.022, 0.62, inox, sx * 0.339, RY + 0.066, 0, robot);   // gövde alt paslanmaz ray
   // yan tutamaklar
   for (const sz of [-1, 1]) {
-    rod([-0.1, RY + 0.115, sz * 0.372], [0.1, RY + 0.115, sz * 0.372], 0.008, M.koyu, robot, 10);
-    for (const hx of [-0.1, 0.1]) box(0.022, 0.022, 0.03, M.koyu, hx, RY + 0.115, sz * 0.357, robot);
+    rod([-0.1, RY + 0.115, sz * 0.372], [0.1, RY + 0.115, sz * 0.372], 0.008, siyah, robot, 10);
+    for (const hx of [-0.1, 0.1]) box(0.022, 0.022, 0.03, siyah, hx, RY + 0.115, sz * 0.357, robot);
   }
-  // üst plaka: turuncu, DOKA (yazı önden okunur: soldan sağa −z yönünde)
-  const plakaTex = canvasTex(512, 282, (x, w, h) => {
-    x.fillStyle = '#f0601e'; x.fillRect(0, 0, w, h);
-    x.fillStyle = '#ffffff'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    if ('letterSpacing' in x) x.letterSpacing = '14px';
-    x.font = '700 138px "Space Grotesk", "Segoe UI", sans-serif';
-    x.fillText('DOKA', w / 2 + 7, h * 0.43);
-    if ('letterSpacing' in x) x.letterSpacing = '6px';
-    x.font = '600 30px "Space Grotesk", "Segoe UI", sans-serif';
-    x.fillText('MÜHENDİSLİK', w / 2 + 3, h * 0.8);
+  // üst plaka: siyah, beyaz doka logosu (logo önden okunur: soldan sağa −z yönünde)
+  const plakaTex = canvasTex(512, 185, (x, w, h) => {
+    x.fillStyle = '#18191c'; x.fillRect(0, 0, w, h);
+    lib.dokaLogo(x, w / 2, h / 2, 118, '#ffffff');
   });
-  box(0.22, 0.008, 0.4, turuncu, 0.055, RY + 0.204, 0, robot);
-  const plakaYuz = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.22), new THREE.MeshStandardMaterial({ map: plakaTex, roughness: 0.42, metalness: 0.05 }));
+  box(0.13, 0.006, 0.36, siyah, 0.07, RY + 0.203, 0, robot);
+  const plakaYuz = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.13), new THREE.MeshStandardMaterial({ map: plakaTex, roughness: 0.5, metalness: 0.1 }));
   plakaYuz.rotation.set(-Math.PI / 2, 0, Math.PI / 2);
-  plakaYuz.position.set(0.055, RY + 0.2085, 0);
+  plakaYuz.position.set(0.07, RY + 0.2065, 0);
   robot.add(plakaYuz);
+  // kayar LED şeritleri (FK-1000 V3'teki gibi): üstte iki yanda, boyuna; her şeritte parlak bir
+  // bölüm o yandaki paletin gittiği yöne kayar (düz giderken ikisi aynı, dönerken zıt yöne)
+  const ledSerit = (sz) => {
+    box(0.32, 0.012, 0.028, mat(0x0a0a0a, { r: 0.5, m: 0.5, key: 'sbLedYuva' }), 0, RY + 0.206, sz, robot);
+    const m = new THREE.MeshStandardMaterial({ color: 0xff4a24, emissive: 0xff3a1a, emissiveIntensity: 0.3 });
+    const seg = box(0.07, 0.01, 0.02, m, 0, RY + 0.2085, sz, robot);
+    return { seg, m, faz: 0 };
+  };
+  const ledSol = ledSerit(-0.265), ledSag = ledSerit(0.265);
   // ön eğimde ürün adı
   {
     const yaziTex = canvasTex(512, 96, (x, w, h) => {
-      x.fillStyle = '#f0601e'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillStyle = '#18191c'; x.textAlign = 'center'; x.textBaseline = 'middle';
       if ('letterSpacing' in x) x.letterSpacing = '8px';
       x.font = '700 62px "Space Grotesk", "Segoe UI", sans-serif';
       x.fillText('SOLARBOT', w / 2 + 4, h / 2 + 2);
@@ -225,17 +229,20 @@ export function create(lib) {
     s.closePath();
     return s;
   };
-  // kıllar: açık renkli sık kıl göbeği (çizgili doku, dönüşü gösterir) + çevresinde helis dizilmiş
-  // ince tutamlar (boy/eğim hafif rastgele → uçlar düzensiz, tek InstancedMesh / fırça)
+  // kıllar (siyah, FK-1000 V3'teki gibi): sık kıl göbeği (çizgili doku, dönüşü gösterir) + çevresinde
+  // helis dizilmiş ince tutamlar (boy/eğim hafif rastgele → uçlar düzensiz, tek InstancedMesh / fırça)
   const NZ = 64, NA = 18;
   const tutamGeo = new THREE.BoxGeometry(0.0065, 0.032, 0.0075);
   tutamGeo.translate(0, 0.016, 0);                       // taban mil yüzeyinde, uç dışa
-  const tutamMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, metalness: 0 });
+  const tutamMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.75, metalness: 0 });
   const gobekTex = canvasTex(64, 64, (x, w, h) => {
-    x.fillStyle = '#d9d5cc'; x.fillRect(0, 0, w, h);
-    for (let i = 0; i < 40; i++) { x.fillStyle = `rgba(120,112,100,${0.12 + Math.random() * 0.2})`; x.fillRect(Math.random() * w, 0, 1 + Math.random() * 2, h); }
+    x.fillStyle = '#141518'; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 40; i++) { x.fillStyle = `rgba(70,74,82,${0.25 + Math.random() * 0.35})`; x.fillRect(Math.random() * w, 0, 1 + Math.random() * 2, h); }
   }, { tekrar: [3, 10] });
   const gobekMat = new THREE.MeshStandardMaterial({ map: gobekTex, roughness: 0.9, metalness: 0 });
+  const sensorKutu = mat(0x2c4a94, { r: 0.45, m: 0.2, key: 'sbSensor' });   // FK-1000 modMat
+  const sensorOn = new THREE.MeshStandardMaterial({ color: 0xff5a5a, emissive: 0xff3030, emissiveIntensity: 0.25 });
+  const sensorArka = sensorOn.clone();
   const _s = new THREE.Vector3();
   const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _c = new THREE.Color();
   const fircalar = [1, -1].map((sg) => {
@@ -243,15 +250,18 @@ export function create(lib) {
     const kg = new THREE.ExtrudeGeometry(kapakSekli(sg), { depth: BL - 0.008, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2 });
     kg.translate(cx, RY, -(BL - 0.008) / 2);
     kabuk(kg);
-    box(0.15, 0.013, BL - 0.01, griBant, cx, RY + 0.1165, 0, robot);     // gri bant
-    box(0.15, 0.05, BL - 0.01, turuncu, cx, RY + 0.085, 0, robot);       // turuncu etek (alt kenar 0.06 → altında ≈6 cm kıl görünür)
+    box(0.15, 0.013, BL - 0.01, inox, cx, RY + 0.1165, 0, robot);        // paslanmaz ray
+    box(0.15, 0.05, BL - 0.01, siyah, cx, RY + 0.085, 0, robot);         // siyah etek (alt kenar 0.06 → altında ≈6 cm kıl görünür)
     for (const ez of [-1, 1]) {
-      box(0.158, 0.148, 0.012, beyaz, cx, RY + 0.109, ez * (BL / 2 + 0.004), robot);                   // uç kapağı (mili taşır)
+      box(0.158, 0.148, 0.012, gri, cx, RY + 0.109, ez * (BL / 2 + 0.004), robot);                     // uç kapağı (mili taşır)
       cyl(0.016, 0.012, M.alu, sg * FB, RY + 0.058, ez * (BL / 2 + 0.014), robot, { eksen: 'z', seg: 14 }); // mil yatağı
+      // mavi kenar sensörü modülü (FK-1000 V3'teki gibi), üstünde LED
+      box(0.025, 0.035, 0.05, sensorKutu, sg * (FX + 0.0875), RY + 0.15, ez * 0.3, robot);
+      sphere(0.008, sg > 0 ? sensorOn : sensorArka, sg * (FX + 0.0875), RY + 0.172, ez * 0.3, robot, 10);
     }
-    // gövdeye bağlantı: iki alüminyum braket (kutu üstü → gövde eğimi) + turuncu ara şerit
+    // gövdeye bağlantı: iki alüminyum braket (kutu üstü → gövde eğimi)
     for (const bz of [-0.2, 0.2]) beam([sg * 0.395, RY + 0.186, bz], [sg * 0.3, RY + 0.143, bz], 0.008, 0.045, M.alu, robot);
-    for (let i = 0; i < 6; i++) cyl(0.005, 0.016, M.kirmizi, sg * (FX - 0.062), RY + 0.053, -0.3 + i * 0.12, robot, { seg: 8 }); // püskürtme memeleri
+    for (let i = 0; i < 6; i++) cyl(0.005, 0.016, inox, sg * (FX - 0.062), RY + 0.053, -0.3 + i * 0.12, robot, { seg: 8 }); // püskürtme memeleri
     // dönen fırça
     const f = new THREE.Group();
     f.position.set(sg * FB, RY + 0.058, 0);
@@ -265,40 +275,40 @@ export function create(lib) {
       _q.setFromEuler(_e.set((Math.random() - 0.5) * 0.25, 0, a - Math.PI / 2 + (Math.random() - 0.5) * 0.3));   // +y dışa (radyal)
       _s.set(1, 0.88 + Math.random() * 0.24, 1);
       kil.setMatrixAt(i, _m4.compose(_p, _q, _s));
-      kil.setColorAt(i, _c.setHSL(0.11, 0.16, 0.8 + Math.random() * 0.13));
+      kil.setColorAt(i, _c.setHSL(0.6, 0.05, 0.07 + Math.random() * 0.08));
     }
     kil.castShadow = true; kil.receiveShadow = true;
     f.add(kil);
     return f;
   });
 
-  // su hattı: arka fırça kutusunun ucundaki rakordan direk dibine beyaz hortum
+  // su hattı: arka fırça kutusunun ucundaki rakordan direk dibine siyah hortum
   {
     const V = (x, y, z) => new THREE.Vector3(x, RY + y, z);
     const yol = new THREE.CatmullRomCurve3([
       V(-0.39, 0.193, -0.37), V(-0.39, 0.193, -0.22), V(-0.36, 0.186, -0.12), V(-0.31, 0.16, -0.07),
       V(-0.24, 0.18, -0.04), V(-0.17, 0.21, -0.015), V(-0.142, 0.214, -0.004),
     ]);
-    const h = new THREE.Mesh(new THREE.TubeGeometry(yol, 40, 0.009, 8), mat(0xe9e3d3, { r: 0.5, m: 0, key: 'hortum' }));
+    const h = new THREE.Mesh(new THREE.TubeGeometry(yol, 40, 0.009, 8), siyah);
     h.castShadow = h.receiveShadow = true;
     robot.add(h);
-    cyl(0.013, 0.032, M.alu, -0.39, RY + 0.193, -0.38, robot, { eksen: 'z', seg: 12 });   // rakor
+    cyl(0.013, 0.032, inox, -0.39, RY + 0.193, -0.38, robot, { eksen: 'z', seg: 12 });   // rakor
   }
 
-  // kamera direği (arkada, ortada): flanş, beyaz konik direk, durum LED halkası, OAK-D başlığı
+  // kamera direği (arkada, ortada): flanş, gri konik direk, durum LED halkası, siyah OAK-D başlığı
   const MX = -0.11;
-  cyl(0.032, 0.03, M.alu, MX, RY + 0.215, 0, robot, { seg: 20 });
-  cyl(0.022, 0.32, beyaz, MX, RY + 0.39, 0, robot, { seg: 20, r2: 0.027 });
-  cyl(0.036, 0.07, beyaz, MX, RY + 0.585, 0, robot, { seg: 20, r2: 0.022 });
+  cyl(0.032, 0.03, inox, MX, RY + 0.215, 0, robot, { seg: 20 });
+  cyl(0.022, 0.32, gri, MX, RY + 0.39, 0, robot, { seg: 20, r2: 0.027 });
+  cyl(0.036, 0.07, gri, MX, RY + 0.585, 0, robot, { seg: 20, r2: 0.022 });
   const durumLed = lamba(0x2ea043, 1.5);
   cyl(0.029, 0.014, durumLed, MX, RY + 0.53, 0, robot, { seg: 20 });
   const kam = new THREE.Group();
   kam.position.set(MX, RY + 0.655, 0);
   kam.rotation.z = -0.42;                  // öne-aşağı bakar
   robot.add(kam);
-  box(0.075, 0.06, 0.14, beyaz, 0, 0, 0, kam);
-  box(0.09, 0.012, 0.15, beyaz, 0.006, 0.036, 0, kam);                  // güneşlik
-  box(0.004, 0.032, 0.115, M.siyah, 0.0385, 0, 0, kam);                // OAK-D ön yüzü
+  box(0.075, 0.06, 0.14, siyah, 0, 0, 0, kam);
+  box(0.09, 0.012, 0.15, gri, 0.006, 0.036, 0, kam);                    // güneşlik
+  box(0.004, 0.032, 0.115, M.koyu, 0.0385, 0, 0, kam);                 // OAK-D ön yüzü
   for (const dz of [-0.04, 0, 0.04]) cyl(0.008, 0.006, mat(0x3a5a8a, { r: 0.1, m: 0.6, key: 'lens' }), 0.041, 0, dz, kam, { eksen: 'x', seg: 12 });
   const koni = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.3, 24, 1, true), new THREE.MeshBasicMaterial({
     color: 0x39c5cf, transparent: true, opacity: 0.08, depthWrite: false, side: THREE.DoubleSide,
@@ -306,8 +316,8 @@ export function create(lib) {
   koni.rotation.z = Math.PI / 2;           // ucu kamerada, açıklığı +X
   koni.position.x = 0.67;
   kam.add(koni);
-  // robotun sabit parçaları malzeme başına birleşir (fırçalar döner, LED/palet malzemeleri tek)
-  lib.sabitle(robot, fircalar);
+  // robotun sabit parçaları malzeme başına birleşir (fırçalar döner, LED bölümleri kayar)
+  lib.sabitle(robot, [...fircalar, ledSol.seg, ledSag.seg]);
 
   // ---------------------------------------------------------------- yer istasyonu (tablet + kule lambası)
   const ist = new THREE.Group();
@@ -485,6 +495,20 @@ export function create(lib) {
     const vL = R.v - R.w * 0.29, vR = R.v + R.w * 0.29;
     texSol.offset.x -= vL * dt * 12.5;
     texSag.offset.x -= vR * dt * 12.5;
+    // kayar LED'ler (FK-1000 V3 mantığı): parlak bölüm o yandaki paletin yönünde kayar, durunca söner
+    for (const [L, v] of [[ledSol, vL], [ledSag, vR]]) {
+      const kos = Math.abs(v) > 0.01 && durum !== 'acil';
+      if (kos) L.faz += Math.sign(v) * 0.45 * dt;
+      const ph = ((L.faz % 0.25) + 0.25) % 0.25;
+      L.seg.position.x = -0.125 + ph;
+      L.m.emissiveIntensity = durum === 'acil' ? 0.05 : kos ? 1.8 + Math.sin(t * 4) * 0.4 : 0.3;
+    }
+    // kenar sensörleri: gidilen yöndeki kutunun LED'i yanar, kenar algılanınca turuncu yanıp söner
+    for (const [sm, on] of [[sensorOn, R.v > 0.005], [sensorArka, R.v < -0.005]]) {
+      const yanip = on && kenarT > 0 && Math.sin(t * 14) > 0;
+      sm.emissive.setHex(yanip ? 0xffaa30 : 0xff3030);
+      sm.emissiveIntensity = durum === 'acil' ? 0.05 : on ? (kenarT > 0 ? (yanip ? 2.4 : 0.3) : 0.8) : 0.25;
+    }
     const fircaDon = fircaAcik && durum !== 'acil' && durum !== 'sarj';
     if (fircaDon) { fircalar[0].rotation.z -= 16 * dt; fircalar[1].rotation.z += 16 * dt; }
     if (fircaDon && panelde() && (Math.abs(R.v) > 0.005 || Math.abs(R.w) > 0.02)) fircaSil();
@@ -583,7 +607,9 @@ export function create(lib) {
     kamera: { poz: [-1.6, 4.4, 6.4], hedef: [0.3, 1.25, -0.3] },
     mekanizmalar: [
       'Paletler: sol/sağ palet ayrı hızda döner (diferansiyel sürüş, yerinde dönüş)',
-      'Ön ve arka fırça kutusu: gövdeye braketle bağlı; içindeki kıllı fırçalar ters yönde döner, ikisi de geçtiği yerdeki tozu 0.74 m genişlikte siler',
+      'Ön ve arka fırça kutusu: gövdeye braketle bağlı; içindeki siyah kıllı fırçalar ters yönde döner, ikisi de geçtiği yerdeki tozu 0.74 m genişlikte siler',
+      'Kayar LED şeritleri (FK-1000 V3\'teki gibi): üstte iki yanda; parlak bölüm o yandaki paletin yönünde kayar — düz giderken ikisi aynı yöne, yerinde dönerken zıt yöne',
+      'Mavi kenar sensörleri: gidilen yöndeki fırça kutusunun LED\'leri yanar, kenar algılanınca turuncu yanıp söner',
       'Zikzak kapsama: 6 şerit boyunca git, şerit değiştir, geri dön',
       'Batarya %15 altına inince şarj platformuna döner, dolunca kaldığı şeritten devam eder',
       'OAK-D kamera: direk üstünde, öne-aşağı bakar (görüş konisi)',
@@ -591,7 +617,8 @@ export function create(lib) {
     ],
     cikarim: [
       'solarbot-img-02/04/05 ve video-03 (prototip): alçak gövde, iki yanda palet, arkada direkte kamera, yan tutamak, önde beyaz su borusu → ölçüler (~0.7 × 0.7 m gövde, 0.78 m fırça kutusu) ve yerleşim buradan.',
-      'KAAN\'IN DÜZELTMESİ (referans görsel, marka DOKA): fırçalar gövdeye bitişik ön/arka fırça kutularında — beyaz kapak, gri bant, turuncu etek, altında beyaz kıllar; kamera başlığı beyaz konik direğin üstünde; üstte turuncu marka plakası → kaporta bu görsele göre yeniden çizildi (prototipteki açık şasi ve sarı tamponlar yerine).',
+      'KAAN\'IN DÜZELTMESİ (referans görsel): fırçalar gövdeye bitişik ön/arka fırça kutularında, kamera başlığı konik direğin üstünde → kaporta biçimi bu görsele göre (prototipteki açık şasi ve sarı tamponlar yerine).',
+      'KAAN\'IN DÜZELTMESİ (renk ve marka): renkler FK-1000 V3 ile aynı — gri tabla, paslanmaz ray, siyah etek ve siyah fırçalar; turuncu ayrıntılar yerine FK-1000 V3\'teki gibi kayar LED şeritleri ve mavi kenar sensörleri; üstteki plakada firmanın resmi doka logosu.',
       'solarbot-video-02: elde tutulan uzun siyah kamera → OAK-D (3 lensli) olarak direğe kondu.',
       'solarbot-img-07: önünde fırça/sıyırıcı olan paletli versiyon; KAAN\'IN DÜZELTMESİ: robotun önünde VE arkasında dönen fırça var → iki fırça.',
       'solarbot-img-01 (BMS) ve -06 (pano): LiFePO4 8S 24V batarya ve Smart BMS → batarya modeli ve şarja dönüş davranışı.',

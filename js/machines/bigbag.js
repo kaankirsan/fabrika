@@ -11,10 +11,10 @@
 //  V03: gri portal çerçeve, ortada dikey hidrolik silindir gri taşıyıcı kirişi kolonlarda
 //       yukarı-aşağı sürer; mavi hidrolik güç ünitesi, lambalı gri kumanda kutusu + anten.
 //
-// Yerleşim (yerel, dış saha): portal -X ucunda, ayaklar +X'e uzanır; kamyon şeridi z=ZC
-// boyunca, kamyon +X'ten geri geri gelir. Portal kamyon kasasının içinden geçebileceği
-// genişlikte (TAHMİN) → kamyon her yuvayı balyanın altına getirebilir. Stok + forklift önde (+Z).
-// Konteynerin kamyon şeridi yerel z=+12'de → yerel z ∈ [-5.3, 4.3].
+// Yerleşim (yerel; fabrikada B holü, ry = π/2): portal -X ucunda, ayaklar +X'e uzanır; kamyon
+// şeridi z=ZC boyunca, kamyon +X'ten (holün arka duvarındaki RAMPA 2 kapısından) geri geri gelir.
+// Portal kamyon kasasının içinden geçebileceği genişlikte (TAHMİN) → kamyon her yuvayı balyanın
+// altına getirebilir. Stok + forklift önde (+Z). Ayak izi yerel z ∈ [-5.3, 4.3].
 
 export function create(lib) {
   const {
@@ -675,6 +675,7 @@ export function create(lib) {
       'MKN-V03: gri portal çerçeve, ortadaki dikey silindir gri taşıyıcı kirişi yukarı-aşağı sürüyor; mavi hidrolik ünite, lambalı gri kumanda kutusu + anten, turuncu telsiz → taşıyıcı, güç ünitesi, kumanda kutusu.',
       'TAHMİN: portal genişliği (kolonlar arası 3.2 m) kamyon kasasının ayakların ve kolonların arasından geçebileceği şekilde alındı; videoda çerçeve daha dar görünüyor — gerçekte kamyon yalnız kasa arkasını sokuyor olabilir.',
       'TAHMİN: forkliftle besleme, kamyonun 4 balya alması, balya ~1 t / 1.0 × 1.15 m, kıskaç basıncı ~110 bar, kaldırma 1.85 m; süreler hızlandırıldı.',
+      'Sanal fabrikada gösterim için B holüne alındı: kamyon holün arka duvarındaki RAMPA 2 kapısından geri geri girer, yüklenince aynı kapıdan çıkar.',
     ],
     group: g,
     update,

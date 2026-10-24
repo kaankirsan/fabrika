@@ -10,6 +10,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import * as lib from './lib.js';
 import { vrKur } from './vr.js';
 
@@ -19,20 +25,22 @@ const URLP = new URLSearchParams(location.search);
 if (URLP.get('ui') === '0') document.body.classList.add('arayuzsuz');
 
 // Kuzey sırası (z<0) önünü koridora (+Z) verir; güney sırası 180° döner.
-// Konteyner salonun sağ duvarındaki kapıdan çıkılan dış sahada (açık dizi ~30 m + kamyon yolu).
+// Konteyner, FK-1000 ve big bag A holünün doğusundaki B holünde. Konteyner ile big bag
+// ry = π/2: kamyon şeritleri (yerel +X) dünya −Z'ye, B holünün arka duvarındaki kapılara bakar;
+// konteynerin açılan panel dizisi (yerel +Z) doğuya uzanır.
 const YERLESIM = [
   { id: 'kaynak',    x: -38.5, z: -10, ry: 0 },
   { id: 'konveyor',  x: -17.5, z: -10, ry: 0 },
   { id: 'pres',      x: 2.5,   z: -10, ry: 0 },
   { id: 'vagon',     x: 15,    z: -10, ry: 0 },
-  { id: 'konteyner', x: 66,    z: -14, ry: 0 },
+  { id: 'konteyner', x: 60,    z: -14, ry: Math.PI / 2 },
   { id: 'hedef',     x: -30, z: 10,  ry: Math.PI },
   { id: 'jetyakit',  x: -15, z: 10,  ry: Math.PI },
   { id: 'fikstur',   x: 0,   z: 10,  ry: Math.PI },
   { id: 'solarbot',  x: 15,  z: 10,  ry: Math.PI },
-  // "Diğer makineler" (MKN-F/V) — dış saha
-  { id: 'fk1000',    x: 100,   z: 16,  ry: 0 },
-  { id: 'bigbag',    x: 100,   z: -26, ry: 0 },
+  // "Diğer makineler" (MKN-F/V) — B holü
+  { id: 'fk1000',    x: 88,    z: 18,  ry: 0 },
+  { id: 'bigbag',    x: 104,   z: -18, ry: Math.PI / 2 },
   // salon: güney sırası boş yeri + batı uzantısı
   { id: 'saft',      x: 30,    z: 10,  ry: Math.PI },
   { id: 'yangin',    x: -57,   z: -10, ry: 0 },
@@ -50,10 +58,16 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPrefere
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+// Ton eşleme: Khronos PBR Neutral — boya/RAL renklerini kaydırmaz (ACES sarıyı/kırmızıyı
+// soldurup griye çekiyordu), 0.76 altını doğrusal bırakır → HMI ekranları/etiketler de bozulmaz.
+// ?tm=aces|agx|neutral ile karşılaştırılabilir.
+const TON = { aces: [THREE.ACESFilmicToneMapping, 1.05], agx: [THREE.AgXToneMapping, 1.3], neutral: [THREE.NeutralToneMapping, 0.9] };
+[renderer.toneMapping, renderer.toneMappingExposure] = TON[URLP.get('tm')] || TON.neutral;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;   // r184: donanım karşılaştırmalı Vogel-disk PCF, yumuşaklık shadow.radius
+// Gölge haritası kare başına bir kez (ciz() işaretler): AO normal geçişi gölgeyi yeniden çizmesin
+renderer.shadowMap.autoUpdate = false;
+lib.kalite.anisotropi = renderer.capabilities.getMaxAnisotropy();
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1b222b);
@@ -63,8 +77,9 @@ scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.55;
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.05, 900);
-const GENEL = { poz: new THREE.Vector3(-30, 92, 106), hedef: new THREE.Vector3(-30, 0, 4) };
-const SAHA_GORUNUM = { poz: new THREE.Vector3(118, 52, 62), hedef: new THREE.Vector3(90, 0, -2) };
+// genel bakış: A + B holü birlikte (x −106…120); "B Holü" düğmesi: B holüne güneydoğudan
+const GENEL = { poz: new THREE.Vector3(18, 116, 184), hedef: new THREE.Vector3(18, 0, -4) };
+const SAHA_GORUNUM = { poz: new THREE.Vector3(104, 64, 86), hedef: new THREE.Vector3(84, 0, -4) };
 camera.position.copy(GENEL.poz);
 
 const controls = new OrbitControls(camera, canvas);
@@ -79,8 +94,8 @@ controls.update();
 
 // Dikey ekranda (telefon) 152 m'lik salon yandan bakışta ince bir şerit kalıyor:
 // salonu boylamasına, batı ucundan yukarıdan gör.
-const GENEL_DIKEY = { poz: new THREE.Vector3(-165, 170, 3), hedef: new THREE.Vector3(-28, 0, 2) };
-const SAHA_DIKEY = { poz: new THREE.Vector3(76, 165, 46), hedef: new THREE.Vector3(80, 0, -6) };
+const GENEL_DIKEY = { poz: new THREE.Vector3(-172, 196, 3), hedef: new THREE.Vector3(-12, 0, 2) };
+const SAHA_DIKEY = { poz: new THREE.Vector3(83, 150, 62), hedef: new THREE.Vector3(83, 0, -2) };
 const dikey = () => window.innerWidth < window.innerHeight * 0.9;
 const genelGorunum = () => (dikey() ? GENEL_DIKEY : GENEL);
 const sahaGorunum = () => (dikey() ? SAHA_DIKEY : SAHA_GORUNUM);
@@ -124,43 +139,49 @@ window.addEventListener('resize', gorunumAyarla);
 
 // ------------------------------------------------------------------ ışık
 scene.add(new THREE.HemisphereLight(0xe6edf5, 0x3a342c, 1.15));
-// Gölge kutusu salon + dış saha (x -106…134) birlikte kapsasın diye ışık hedefi ortaya alındı
+// Gölge kutusu A + B holü (x -106…120, z ±36) birlikte kapsasın diye ışık hedefi ortaya alındı
 const gunes = new THREE.DirectionalLight(0xfff2df, 2.4);
 gunes.position.set(42, 52, 22);
 gunes.target.position.set(14, 0, 0);
 scene.add(gunes.target);
 gunes.castShadow = true;
 gunes.shadow.mapSize.set(4096, 4096);
-Object.assign(gunes.shadow.camera, { left: -125, right: 125, top: 40, bottom: -40, near: 5, far: 180 });
+Object.assign(gunes.shadow.camera, { left: -125, right: 125, top: 50, bottom: -50, near: 5, far: 190 });
 gunes.shadow.bias = -0.0003;
 gunes.shadow.normalBias = 0.03;
+gunes.shadow.radius = 2.2;   // yumuşak gölge kenarı (PCF Vogel disk, ~13 cm)
 scene.add(gunes);
 
 // ------------------------------------------------------------------ salon
-// Salon batıya uzatıldı (18 makine): x x0…x1; sağ duvarda dış sahaya kapı.
+// A holü (16 makine): x x0…x1, z ±z/2; doğu duvarında B holüne geniş geçit.
 const SALON = { x0: -106, x1: 46, z: 46 };
 SALON.x = SALON.x1 - SALON.x0;
 SALON.xc = (SALON.x0 + SALON.x1) / 2;
+// Binaların zemin dikdörtgenleri (SCADA ana ekranındaki yerleşim haritası vb. bunu okur;
+// yeni hol eklenince buraya da eklenir).
+const BINALAR = [{ ad: 'A HOLÜ', x0: SALON.x0, x1: SALON.x1, z0: -SALON.z / 2, z1: SALON.z / 2 }];
+// B holü: A'nın doğusuna eklenen daha yüksek ve derin hol (konteyner · FK-1000 · big bag).
+// Arka (kuzey, z0) duvarında iki kamyon kapısı: konteyner şeridi (konteyner x'i) ve big bag
+// şeridi (big bag x'i − 2; yerel ZC = −2, ry = π/2'de dünya x'ine düşer). Dışarıda asfalt rampa.
+const _yx = (id) => YERLESIM.find((y) => y.id === id).x;
+const HOL_B = {
+  x0: SALON.x1, x1: 120, z0: -36, z1: 36, H: 11,
+  gecit: [-12, 12], gecitH: 7,                        // A↔B geçidi (paylaşılan duvarda)
+  kapilar: [_yx('konteyner'), _yx('bigbag') - 2], kapiW: 5.6, kapiH: 5.4,
+  rampa: { x0: 50, x1: 114, z0: -64 },               // kapı önü asfalt (kamyonlar burada bekler)
+};
+BINALAR.push({ ad: 'B HOLÜ', x0: HOL_B.x0, x1: HOL_B.x1, z0: HOL_B.z0, z1: HOL_B.z1 });
+// salonKur'un ortam modülüne (js/cevre.js) verdiği ortak malzemeler (duvara sandviç panel deseni ekler)
+const SALON_MALZEME = {};
+const ON_DUVARLAR = [];   // { g, z }: güney duvarları, kamera içerideyken görünür
+function onDuvarGuncelle(kamZ, vrde) {
+  for (const d of ON_DUVARLAR) d.g.visible = vrde || kamZ < d.z - 0.3;
+}
 function salonKur() {
   const g = new THREE.Group();
-  // Beton zemin: gürültü + hafif lekeler
-  const beton = canvasTex(1024, 1024, (x, w, h) => {
-    x.fillStyle = '#8f9396'; x.fillRect(0, 0, w, h);
-    const id = x.getImageData(0, 0, w, h);
-    for (let i = 0; i < id.data.length; i += 4) {
-      const n = (Math.random() - 0.5) * 18;
-      id.data[i] += n; id.data[i + 1] += n; id.data[i + 2] += n;
-    }
-    x.putImageData(id, 0, 0);
-    for (let i = 0; i < 40; i++) {
-      x.fillStyle = `rgba(60,60,58,${Math.random() * 0.06})`;
-      x.beginPath(); x.arc(Math.random() * w, Math.random() * h, 30 + Math.random() * 120, 0, Math.PI * 2); x.fill();
-    }
-    x.strokeStyle = 'rgba(40,40,40,.25)'; x.lineWidth = 2; // derz çizgileri (6 m)
-    x.strokeRect(0, 0, w, h);
-  }, { tekrar: [SALON.x / 6, SALON.z / 6] });
+  // Cilalı endüstriyel beton zemin (6 m derz karesi, çok ölçekli leke/parlaklık; lib.zeminMalzemesi)
   const zemin = new THREE.Mesh(new THREE.PlaneGeometry(SALON.x, SALON.z),
-    new THREE.MeshStandardMaterial({ map: beton, roughness: 0.85, metalness: 0.05 }));
+    lib.zeminMalzemesi({ tekrar: [SALON.x / 6, SALON.z / 6] }));
   zemin.rotation.x = -Math.PI / 2;
   zemin.position.x = SALON.xc;
   zemin.receiveShadow = true;
@@ -178,57 +199,144 @@ function salonKur() {
     m.receiveShadow = true;
     g.add(m);
   };
-  serit(SALON.x0 + 2, -2.2, SALON.x1 - 2, -2.2); serit(SALON.x0 + 2, 2.2, SALON.x1 - 2, 2.2);
+  // ana koridor A holünden geçitten B holüne kesintisiz uzanır
+  serit(SALON.x0 + 2, -2.2, HOL_B.x1 - 2, -2.2); serit(SALON.x0 + 2, 2.2, HOL_B.x1 - 2, 2.2);
   // Yaya geçidi çizgileri koridorda
-  for (let x = SALON.x0 + 16; x <= SALON.x1 - 6; x += 20) for (let k = -1.6; k <= 1.6; k += 0.8) serit(x - 1.2, k, x + 1.2, k, 0.35, 0xdedede);
+  for (let x = SALON.x0 + 16; x <= HOL_B.x1 - 6; x += 20) for (let k = -1.6; k <= 1.6; k += 0.8) serit(x - 1.2, k, x + 1.2, k, 0.35, 0xdedede);
 
-  // Duvarlar + kolonlar + pencere bandı. Sağ duvarda dış sahaya açılan büyük kapı (z KAPI[0]…KAPI[1]).
+  // Duvarlar + pencere bandı. Ön (güney) taraf açık: genel bakış oradan. ic: pencere bandının
+  // yüzü (duvar normali yönü, +1/−1), pencere=false → iç (hol arası) duvar, pencere yok.
   const duvarMat = new THREE.MeshStandardMaterial({ color: 0xc9cdd0, roughness: 0.8 });
+  SALON_MALZEME.duvar = duvarMat;
   const pencere = new THREE.MeshStandardMaterial({ color: 0xa9c9e0, emissive: 0x9cc4e4, emissiveIntensity: 0.35, roughness: 0.2 });
-  const H = 9, KAPI = [-20, -5], KH = 7;
-  const xR = SALON.x1;
-  const sagParcalar = [[(-SALON.z / 2 + KAPI[0]) / 2, KAPI[0] + SALON.z / 2], [(KAPI[1] + SALON.z / 2) / 2, SALON.z / 2 - KAPI[1]]];
-  [[SALON.xc, -SALON.z / 2, SALON.x, 0], [SALON.x0, 0, SALON.z, Math.PI / 2], ...sagParcalar.map(([z, L]) => [xR, z, L, Math.PI / 2])].forEach(([x, z, L, ry]) => {
-    const d = box(L, H, 0.25, duvarMat, x, H / 2, z, g);
+  const H = 9;
+  const duvar = (x, z, L, ry, h, { ic = 1, pencereli = true } = {}) => {
+    if (L <= 0.01) return;
+    const d = box(L, h, 0.25, duvarMat, x, h / 2, z, g);
     d.rotation.y = ry;
-    if (L < 6) return;
-    const p = box(L - 2, 1.4, 0.05, pencere, x, H - 1.6, z, g);
+    if (!pencereli || L < 6) return;
+    const p = box(L - 2, 1.4, 0.05, pencere, x, h - 1.6, z, g);
     p.rotation.y = ry;
-    p.position.x += Math.sin(ry) * 0.16; p.position.z += Math.cos(ry) * 0.16;
+    p.position.x += Math.sin(ry) * 0.16 * ic; p.position.z += Math.cos(ry) * 0.16 * ic;
     p.castShadow = false;
-  });
-  // kapı lentosu + ikaz çerçevesi
-  const lento = box(KAPI[1] - KAPI[0], H - KH, 0.25, duvarMat, xR, (H + KH) / 2, (KAPI[0] + KAPI[1]) / 2, g);
-  lento.rotation.y = Math.PI / 2;
-  const ikazK = lib.ikazDokusu([1, 12]);
-  for (const z of KAPI) box(0.3, KH, 0.32, new THREE.MeshStandardMaterial({ map: ikazK, roughness: 0.6 }), xR, KH / 2, z, g);
-  const kapiYazi = lib.levha(['DIŞ SAHA →', 'Konteyner · FK-1000 · Big bag'], 7, 1.3, { bg: '#17324f', font: 92, px: 1200 });
-  kapiYazi.rotation.y = -Math.PI / 2;
-  kapiYazi.position.set(xR - 0.2, KH + 0.9, (KAPI[0] + KAPI[1]) / 2);
-  g.add(kapiYazi);
+  };
+  // z/x aralığı → duvar (uzunluk boyunca ortalanmış)
+  const duvarX = (x0, x1, z, h, o) => duvar((x0 + x1) / 2, z, x1 - x0, 0, h, o);
+  const duvarZ = (z0, z1, x, h, o) => duvar(x, (z0 + z1) / 2, z1 - z0, Math.PI / 2, h, o);
+  const ikazMat = new THREE.MeshStandardMaterial({ map: lib.ikazDokusu([1, 12]), roughness: 0.6 });
+  const B = HOL_B;
 
-  // Dış saha: asfalt + kamyon şeridi çizgileri
-  const SAHA = { x0: xR, x1: 134, z0: -36, z1: 34 };
-  const asfalt = canvasTex(512, 512, (x, w, h) => {
-    x.fillStyle = '#4b4f53'; x.fillRect(0, 0, w, h);
-    const id = x.getImageData(0, 0, w, h);
+  // --- A holü: arka + batı duvarı
+  duvarX(SALON.x0, SALON.x1, -SALON.z / 2, H);
+  duvarZ(-SALON.z / 2, SALON.z / 2, SALON.x0, H);
+
+  // --- B holü zemini: A ile aynı beton malzemesi (UV, A'nın dokuya işlenmiş tekrarına göre ölçeklenir → tek çizim)
+  const bW = B.x1 - B.x0, bD = B.z1 - B.z0;
+  const zeminBGeo = new THREE.PlaneGeometry(bW, bD);
+  const uvB = zeminBGeo.attributes.uv;
+  for (let i = 0; i < uvB.count; i++) uvB.setXY(i, uvB.getX(i) * (bW / SALON.x), uvB.getY(i) * (bD / SALON.z));
+  const zeminB = new THREE.Mesh(zeminBGeo, zemin.material);
+  zeminB.rotation.x = -Math.PI / 2;
+  zeminB.position.set((B.x0 + B.x1) / 2, 0, (B.z0 + B.z1) / 2);
+  zeminB.receiveShadow = true;
+  g.add(zeminB);
+
+  // --- A↔B paylaşılan duvar (x = B.x0, B holü yüksekliğinde) + geniş geçit
+  duvarZ(B.z0, -SALON.z / 2, B.x0, B.H, { ic: 1 });                 // A'nın arkasında kalan dış parça
+  duvarZ(-SALON.z / 2, B.gecit[0], B.x0, B.H, { pencereli: false });
+  duvarZ(B.gecit[1], SALON.z / 2, B.x0, B.H, { pencereli: false });
+  duvarZ(SALON.z / 2, B.z1, B.x0, B.H, { ic: 1 });
+  const gL = B.gecit[1] - B.gecit[0];
+  box(0.25, B.H - B.gecitH, gL, duvarMat, B.x0, (B.H + B.gecitH) / 2, (B.gecit[0] + B.gecit[1]) / 2, g);   // lento
+  for (const z of B.gecit) box(0.32, B.gecitH, 0.3, ikazMat, B.x0, B.gecitH / 2, z, g);
+  const gecitA = lib.levha(['B HOLÜ →', 'Konteyner · FK-1000 · Big bag'], 8, 1.5, { bg: '#17324f', font: 92, px: 1200 });
+  gecitA.rotation.y = -Math.PI / 2;
+  gecitA.position.set(B.x0 - 0.2, B.gecitH + 1.2, 0);
+  g.add(gecitA);
+  const gecitB = lib.levha(['← A HOLÜ', 'Üretim & test hücreleri'], 8, 1.5, { bg: '#17324f', font: 92, px: 1200 });
+  gecitB.rotation.y = Math.PI / 2;
+  gecitB.position.set(B.x0 + 0.2, B.gecitH + 1.2, 0);
+  g.add(gecitB);
+
+  // --- B holü arka (kuzey) duvarı: kamyon kapıları arasında parçalar
+  const kx = [...B.kapilar].sort((a, b) => a - b), kw = B.kapiW / 2;
+  let xBas = B.x0;
+  for (const k of kx) { duvarX(xBas, k - kw, B.z0, B.H); xBas = k + kw; }
+  duvarX(xBas, B.x1, B.z0, B.H);
+  // --- doğu duvarı (pencere bandı içeride: −X)
+  duvarZ(B.z0, B.z1, B.x1, B.H, { ic: -1 });
+
+  // --- ön (güney) duvarlar: göz hizasında holün güneyi kara boşluk gibi görünmesin.
+  // Genel bakış güneyden baktığı için yalnızca kamera duvarın iç tarafındayken (ya da VR'da)
+  // görünürler (onDuvarGuncelle). Gölge atmazlar: içeriyi karartmasınlar.
+  for (const [x0, x1, z, h] of [[SALON.x0, SALON.x1, SALON.z / 2, H], [B.x0, B.x1, B.z1, B.H]]) {
+    const og = new THREE.Group();
+    const L = x1 - x0, xc = (x0 + x1) / 2;
+    const d = box(L, h, 0.25, duvarMat, xc, h / 2, z, og);
+    d.castShadow = false;
+    const p = box(L - 2, 1.4, 0.05, pencere, xc, h - 1.6, z - 0.16, og);
+    p.castShadow = false;
+    for (let cx = x0 + 7.5; cx <= x1 - 4; cx += 15) {
+      const k = box(0.5, h, 0.5, M.mavi, cx, h / 2, z - 0.38, og);
+      k.castShadow = false;
+    }
+    scene.add(og);
+    lib.sabitle(og);
+    ON_DUVARLAR.push({ g: og, z });
+  }
+
+  // --- kamyon kapıları: lento, ikaz çerçeve, yukarı sarılmış seksiyonel kapı kutusu, babalar, rampa levhası
+  const kutuMat = new THREE.MeshStandardMaterial({ color: 0x5b6670, roughness: 0.5, metalness: 0.4 });
+  const babaMat = new THREE.MeshStandardMaterial({ color: 0xf2c200, roughness: 0.55 });
+  kx.forEach((k, i) => {
+    box(B.kapiW, B.H - B.kapiH, 0.25, duvarMat, k, (B.H + B.kapiH) / 2, B.z0, g);
+    for (const s of [-1, 1]) {
+      box(0.3, B.kapiH, 0.34, ikazMat, k + s * (kw + 0.05), B.kapiH / 2, B.z0, g);
+      for (const dz of [1.2, -1.6]) lib.cyl(0.13, 1.1, babaMat, k + s * (kw + 0.55), 0.55, B.z0 + dz, g, { seg: 14 });
+    }
+    box(B.kapiW + 0.5, 0.7, 0.7, kutuMat, k, B.kapiH + 0.4, B.z0 + 0.5, g);        // sarılı kapı kutusu
+    const lv = lib.levha([`RAMPA ${i + 1}`, k === _yx('konteyner') ? 'Konteyner kamyonu' : 'Big bag kamyonu'],
+      4.2, 0.9, { bg: '#17324f', font: 92, px: 900 });
+    lv.position.set(k, B.kapiH + 1.5, B.z0 + 0.16);
+    g.add(lv);
+  });
+  // B holü tabelası (arka duvar, kapıların arasında)
+  const tabB = lib.levha(['B HOLÜ', 'Ağır makine & saha sistemleri'], 10, 1.8, { bg: '#17324f', font: 92, px: 1400 });
+  tabB.position.set((kx[0] + kx[1]) / 2, B.H - 3.4, B.z0 + 0.15);
+  g.add(tabB);
+
+  // --- kolonlar (arka ve doğu duvar boyunca, kapı açıklıklarını atla)
+  for (let cx = B.x0 + 6; cx <= B.x1 - 4; cx += 12) {
+    if (kx.some((k) => Math.abs(cx - k) < kw + 1)) continue;
+    box(0.5, B.H, 0.5, M.mavi, cx, B.H / 2, B.z0 + 0.38, g);
+  }
+  for (let cz = B.z0 + 12; cz <= B.z1 - 6; cz += 12) box(0.5, B.H, 0.5, M.mavi, B.x1 - 0.38, B.H / 2, cz, g);
+
+  // --- içeride kamyon şeritleri (beyaz kesikli kenar çizgileri, kapıdan makineye)
+  const SERIT_SON = { [kx[0]]: -9, [kx[1]]: -8 };
+  for (const k of kx) for (const s of [-1, 1]) {
+    for (let z = B.z0 + 0.6; z < (SERIT_SON[k] ?? -8); z += 3) serit(k + s * 1.9, z, k + s * 1.9, Math.min(z + 1.6, SERIT_SON[k] ?? -8), 0.14, 0xe8e8e8);
+  }
+
+  // --- kapı önü asfalt rampa (kamyonlar dışarıda bekler / uzaklaşır)
+  const R = B.rampa;
+  const asfalt = canvasTex(512, 512, (cx2, w, h) => {
+    cx2.fillStyle = '#4b4f53'; cx2.fillRect(0, 0, w, h);
+    const id = cx2.getImageData(0, 0, w, h);
     for (let i = 0; i < id.data.length; i += 4) { const n = (Math.random() - 0.5) * 26; id.data[i] += n; id.data[i + 1] += n; id.data[i + 2] += n; }
-    x.putImageData(id, 0, 0);
-  }, { tekrar: [(SAHA.x1 - SAHA.x0) / 8, (SAHA.z1 - SAHA.z0) / 8] });
-  const saha = new THREE.Mesh(new THREE.PlaneGeometry(SAHA.x1 - SAHA.x0, SAHA.z1 - SAHA.z0),
+    cx2.putImageData(id, 0, 0);
+  }, { tekrar: [(R.x1 - R.x0) / 8, (B.z0 - R.z0) / 8] });
+  const rampa = new THREE.Mesh(new THREE.PlaneGeometry(R.x1 - R.x0, B.z0 - R.z0),
     new THREE.MeshStandardMaterial({ map: asfalt, roughness: 0.95 }));
-  saha.rotation.x = -Math.PI / 2;
-  saha.position.set((SAHA.x0 + SAHA.x1) / 2, -0.002, (SAHA.z0 + SAHA.z1) / 2);
-  saha.receiveShadow = true;
-  g.add(saha);
-  for (let x = xR + 2; x < SAHA.x1 - 2; x += 6) serit(x, -18.6, x + 3, -18.6, 0.15, 0xe8e8e8);
-  serit(xR + 1, -9.4, SAHA.x1 - 1, -9.4, 0.15, 0xe8e8e8);
-  serit(xR, KAPI[0] + 0.5, xR + 4, KAPI[0] + 0.5, 0.12); serit(xR, KAPI[1] - 0.5, xR + 4, KAPI[1] - 0.5, 0.12);
+  rampa.rotation.x = -Math.PI / 2;
+  rampa.position.set((R.x0 + R.x1) / 2, -0.002, (B.z0 + R.z0) / 2);
+  rampa.receiveShadow = true;
+  g.add(rampa);
+  for (const k of kx) for (const s of [-1, 1]) serit(k + s * 1.9, B.z0 - 0.3, k + s * 1.9, R.z0 + 1, 0.15, 0xe8e8e8);
+  serit(R.x0 + 1, R.z0 + 1, R.x1 - 1, R.z0 + 1, 0.15, 0xe8e8e8);
   for (let x = SALON.x0 + 7.5; x <= SALON.x1 - 7; x += 15) box(0.5, H, 0.5, M.mavi, x, H / 2, -SALON.z / 2 + 0.38, g);
-  // Arka duvarda "SANAL FABRİKA" yazısı (kolonların arasına denk gelir)
-  const yazi = lib.levha(['SANAL FABRİKA', 'Kaan Kırşan · Otomasyon & Robotik'], 14, 2.4, { bg: '#17324f', font: 92, px: 1600 });
-  yazi.position.set(-31, 5.4, -SALON.z / 2 + 0.15);
-  g.add(yazi);
+  // Arka duvar ortası: "SANAL FABRİKA" başlıklı SCADA video duvarı (js/scada.js kurar;
+  // kurulamazsa yükleme sonundaki SCADA bölümü eski tabelayı koyar)
   scene.add(g);
   lib.sabitle(g);   // salon tamamen sabit: duvar/şerit/kolon/kapı parçaları malzeme başına birleşir
 }
@@ -371,7 +479,7 @@ function sec(x, { anlik = false } = {}) {
   secili = x;
   document.querySelectorAll('.kart').forEach((k, i) => k.classList.toggle('secili', makineler[i] === x));
   if (!x) {
-    $('panel').hidden = true; gorunumAyarla();
+    $('panel').hidden = true; $('panel-ac').hidden = true; gorunumAyarla();
     const G = genelGorunum();
     if (anlik) { camera.position.copy(G.poz); controls.target.copy(G.hedef); } else uc(G.poz, G.hedef);
     return;
@@ -413,8 +521,14 @@ function paneliKur(x) {
   };
   const ust = el('div', 'p-ust');
   el('h2', '', `<span style="color:var(--sari);font-family:var(--mono);font-size:14px">${String(x.no).padStart(2, '0')}</span> ${m.ad}`, ust);
-  const kapat = el('button', 'kapat', '×', ust);
-  kapat.title = 'Genel bakışa dön';
+  const dugmeler = el('div', 'p-dugmeler', '', ust);
+  const gizle = el('button', 'gizle', '⟩', dugmeler);
+  gizle.title = 'Paneli gizle, makinede kal (P)';
+  gizle.setAttribute('aria-label', 'Paneli gizle');
+  gizle.onclick = () => paneliGoster(false);
+  const kapat = el('button', 'kapat', '×', dugmeler);
+  kapat.title = 'Genel bakışa dön (Esc)';
+  kapat.setAttribute('aria-label', 'Genel bakışa dön');
   kapat.onclick = () => sec(null);
   el('div', 'p-kisa', m.kisa || '');
   const durumEl = el('span', 'durum', '');
@@ -446,7 +560,9 @@ function paneliKur(x) {
     el('summary', '', 'Fotoğraf / videodan çıkarımlar', det);
     el('ul', 'liste-m', m.cikarim.map((s) => `<li>${s}</li>`).join(''), det);
   }
-  $('panel').hidden = false;
+  $('panel').hidden = panelGizli;
+  $('panel-ac').hidden = !panelGizli;
+  $('panel-ac').textContent = `‹ ${String(x.no).padStart(2, '0')} ${m.ad}`;
   P.parentElement.scrollTop = 0;
   panelGuncelle = () => {
     const d = m.durum();
@@ -458,6 +574,18 @@ function paneliKur(x) {
   panelGuncelle();
 }
 let panelGuncelle = () => {};
+// Panel gizlenince kamera seçili makinede kalır (görüntü merkezi serbest alana kayar);
+// tercih makineler arasında gezerken de korunur.
+let panelGizli = false;
+function paneliGoster(acik) {
+  if (!secili) return;
+  panelGizli = !acik;
+  $('panel').hidden = !acik;
+  $('panel-ac').hidden = acik;
+  if (acik) panelGuncelle();
+  gorunumAyarla();
+}
+$('panel-ac').onclick = () => paneliGoster(true);
 
 function kontrolleriCiz(liste, parent) {
   const el = (tag, cls, html, p = parent) => {
@@ -606,14 +734,34 @@ window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   const k = e.key.toLowerCase();
   if (k === 'escape') sec(null);
+  else if (k === 'p' && secili) paneliGoster($('panel').hidden);
   else if (/^[1-9]$/.test(k) && makineler[+k - 1]) sec(makineler[+k - 1]);
   else if (k === 'e' || k === 'q') {
     // listede sonraki / önceki makine (9'dan fazla makine için)
     const n = makineler.length, i = secili ? makineler.indexOf(secili) : (k === 'e' ? -1 : 0);
     sec(makineler[(i + (k === 'e' ? 1 : -1) + n) % n]);
   } else tus.add(k);
+  tusIsigi(k, true);
 });
-window.addEventListener('keyup', (e) => tus.delete(e.key.toLowerCase()));
+window.addEventListener('keyup', (e) => { const k = e.key.toLowerCase(); tus.delete(k); tusIsigi(k, false); });
+// pencere odağı kaçarsa (Alt+Tab) keyup gelmez: yürüyüş takılı kalmasın
+window.addEventListener('blur', () => { tus.clear(); document.querySelectorAll('#ipucu kbd.basik').forEach((el) => el.classList.remove('basik')); });
+
+// ------------------------------------------------------------------ kontrol kartı (alt ipucu)
+// Basılan tuş kartta yanar; × ile küçülür, tercih bu tarayıcıda hatırlanır.
+function tusIsigi(k, acik) {
+  document.querySelectorAll(`#ipucu kbd[data-t="${CSS.escape(k)}"]`).forEach((el) => el.classList.toggle('basik', acik));
+}
+function ipucuGoster(acik, kaydet = true) {
+  $('ipucu').hidden = !acik;
+  $('ipucu-ac').hidden = acik;
+  if (kaydet) try { localStorage.setItem('fabrika-ipucu', acik ? 'acik' : 'kapali'); } catch {}
+}
+$('ipucu-kapat').onclick = () => ipucuGoster(false);
+$('ipucu-ac').onclick = () => ipucuGoster(true);
+let ipucuKapali = false;
+try { ipucuKapali = localStorage.getItem('fabrika-ipucu') === 'kapali'; } catch {}
+ipucuGoster(!ipucuKapali, false);
 const _ileri = new THREE.Vector3(), _sag = new THREE.Vector3();
 function yuru(dt) {
   if (!tus.size) return;
@@ -652,7 +800,9 @@ function ekranlariAyarla() {
   camera.getWorldPosition(_cw);
   for (const x of makineler) {
     const yakin = _cw.distanceTo(x.kure.center) - x.kure.radius < 45;
-    x.kok.userData.ekranAktif = x === secili || (yakin && _fr.intersectsSphere(x.kure));
+    const gorus = _fr.intersectsSphere(x.kure);
+    x.kok.userData.ekranGorus = gorus;   // uzaktan görüşte: SCADA ekranı seyrek tazelenir
+    x.kok.userData.ekranAktif = x === secili || (yakin && gorus);
   }
 }
 const PR_MAX = Math.min(window.devicePixelRatio, 2);
@@ -665,11 +815,154 @@ function cozunurlukAyarla(dt) {
   let yeni = prSimdi;
   if (kareOrt > 1 / 38 && prSimdi > 1) yeni = Math.max(1, prSimdi - 0.25);
   else if (kareOrt < 1 / 56 && prSimdi < PR_MAX) yeni = Math.min(PR_MAX, prSimdi + 0.25);
-  if (yeni !== prSimdi) { prSimdi = yeni; renderer.setPixelRatio(prSimdi); renderer.setSize(window.innerWidth, window.innerHeight); }
+  // çözünürlük tabanda ve hâlâ yavaşsa efektleri kademeli kapat: önce AO (yalnız gerçekten
+  // çalışıyorken — genel bakıştaki yavaşlık çizim çağrısı kaynaklı, AO'yla ilgisiz), çok yavaşsa tümü
+  else if (kareOrt > 1 / 38 && efekt.seviye === 2 && gtao.enabled) efektKademe(1);
+  else if (kareOrt > 1 / 28 && efekt.seviye > 0) efektKademe(0);
+  if (yeni !== prSimdi) { prSimdi = yeni; renderer.setPixelRatio(prSimdi); renderer.setSize(window.innerWidth, window.innerHeight); efektBoyut(); }
+}
+
+// ------------------------------------------------------------------ efektler (son işlem)
+// Masaüstü: MSAA (4×) yarı-float hedef → GTAO (yalnız yakın planda) → seçici bloom → OutputPass
+// (ton eşleme + sRGB). VR'da ve "Efektler" kapalıyken doğrudan renderer.render (eski yol).
+// Bloom eşiği parlaklık (luminance) yerine en büyük kanala bakar: güneşte beyaz boya ~1.2
+// iken kırmızı/yeşil kule lambaları (emissive 2.2–2.4) ancak böyle ayrışır.
+const efekt = { seviye: 0, istek: false };   // seviye 2: AO + bloom, 1: bloom, 0: kapalı
+const efektRT = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+const composer = new EffectComposer(renderer, efektRT);
+const gtao = new GTAOPass(scene, camera, 1, 1, undefined,
+  { radius: 0.6, distanceExponent: 1.3, thickness: 1.4, scale: 1.0, samples: 12, distanceFallOff: 1.0 },
+  { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 5, rings: 2, samples: 12 });
+gtao.blendIntensity = 0.9;
+// AO tamponu CSS pikseli çözünürlüğünde (retina'da 1/4 maliyet; gürültü giderici zaten yumuşatır)
+const _gtaoBoyut = gtao.setSize.bind(gtao);
+gtao.setSize = (w, h) => { const pr = Math.max(1, renderer.getPixelRatio()); _gtaoBoyut(Math.round(w / pr), Math.round(h / pr)); };
+// AO normal geçişinde saydam / alfa-kesik / sprite nesneler gizlenir (cam, çit örgüsü, etiket
+// kartları katı yüzey sanılıp çevresini karartmasın). Liste 2 sn'de bir yenilenir.
+let aoGizli = [], aoTaramaT = 99;
+function aoTara() {
+  aoGizli = [];
+  scene.traverse((o) => {
+    if (o.isSprite || o.isPoints || o.isLine) { aoGizli.push(o); return; }
+    if (!o.isMesh) return;
+    const ms = Array.isArray(o.material) ? o.material : [o.material];
+    if (o.userData.aoHaric || ms.some((m) => m && (m.transparent || m.alphaTest > 0 || m.transmission > 0))) aoGizli.push(o);
+  });
+}
+gtao._overrideVisibility = function () {
+  const c = this._visibilityCache;
+  for (const o of aoGizli) if (o.visible) { o.visible = false; c.push(o); }
+};
+// eşik 2.1: güneşte sarı baret / beyaz boya (~1.6) parlamasın, emissive 2.2+ lambalar parlasın
+const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.35, 0.5, 2.1);
+bloom.materialHighPassFilter.fragmentShader = bloom.materialHighPassFilter.fragmentShader
+  .replace('float v = luminance( texel.xyz );', 'float v = max( texel.r, max( texel.g, texel.b ) );');
+bloom.materialHighPassFilter.needsUpdate = true;
+bloom.highPassUniforms.smoothWidth.value = 0.6;
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(gtao);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+function efektBoyut() {
+  composer.setPixelRatio(renderer.getPixelRatio());
+  composer.setSize(window.innerWidth, window.innerHeight);
+}
+window.addEventListener('resize', efektBoyut);
+function efektKademe(s, { kaydet = false } = {}) {
+  efekt.seviye = s;
+  bloom.enabled = s >= 1;
+  lib.kalite.detay.value = s >= 1 ? 1 : 0;   // yüzey detayı da efektlerle birlikte
+  const k = $('chk-efekt'); if (k) k.checked = s > 0;
+  if (kaydet) try { localStorage.setItem('fabrika-efekt', s > 0 ? '1' : '0'); } catch {}
+}
+{
+  // Varsayılan: masaüstünde açık, dokunmatik/telefonda kapalı; ?efekt=0|1 ve son tercih geçerli
+  const dokunmatik = matchMedia('(hover: none) and (pointer: coarse)').matches || window.innerWidth <= 900;
+  let acik = !dokunmatik;
+  try { const k = localStorage.getItem('fabrika-efekt'); if (k) acik = k === '1'; } catch {}
+  if (URLP.has('efekt')) acik = URLP.get('efekt') !== '0';
+  efekt.istek = acik;
+  efektBoyut();
+  efektKademe(acik ? 2 : 0);
+  $('chk-efekt')?.addEventListener('change', (e) => efektKademe(e.target.checked ? 2 : 0, { kaydet: true }));
+}
+// VR: efektler ve yüzey detayı devre dışı (Quest GPU'su), çıkınca eski seviye
+let efektVrOnce = 0;
+renderer.xr.addEventListener('sessionstart', () => { efektVrOnce = efekt.seviye; lib.kalite.detay.value = 0; });
+renderer.xr.addEventListener('sessionend', () => { efektKademe(efektVrOnce); efektBoyut(); });
+
+// Ortam haritası: oda ortamı hemen; ardından endüstriyel iç mekân HDRI'si (Poly Haven, CC0)
+// yüklenince metal yansımaları gerçek bir depo/atölyeyi yansıtır.
+new HDRLoader().load('vendor/env/empty_warehouse_01_1k.hdr', (hdr) => {
+  hdr.mapping = THREE.EquirectangularReflectionMapping;
+  const eski = scene.environment;
+  scene.environment = pmrem.fromEquirectangular(hdr).texture;
+  scene.environmentIntensity = 0.75;   // depo HDRI'si oda ortamından koyu: metal/boya yansıması dengelensin
+  hdr.dispose(); eski?.dispose();
+}, undefined, (e) => console.warn('HDRI yüklenemedi, oda ortamı kalıyor', e));
+
+// Ölü kıvılcım / su parçacıkları makinelerde y = −10'a "park" ediliyor; salon kenarının ötesinde
+// boşlukta nokta olarak görünüyor (bloom ile parlıyordu) → yalnız Points için zemin altını kırp.
+renderer.localClippingEnabled = true;
+const zeminAlti = [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.5)];
+let noktaTaramaT = 99;
+function noktaKirp() {
+  scene.traverse((o) => {
+    if (o.isPoints && o.material && !o.material.clippingPlanes?.length) { o.material.clippingPlanes = zeminAlti; o.material.needsUpdate = true; }
+  });
+}
+
+function ciz(dt) {
+  if ((noktaTaramaT += dt) > 3) { noktaTaramaT = 0; noktaKirp(); }
+  renderer.shadowMap.needsUpdate = true;
+  if (efekt.seviye > 0 && !renderer.xr.isPresenting) {
+    // AO yalnız yakın planda: genel bakışta (≥ ~75 m) etkisi görünmez, normal geçişi boşuna
+    gtao.enabled = efekt.seviye >= 2 && camera.position.distanceTo(controls.target) < 75;
+    if (gtao.enabled && (aoTaramaT += dt) > 2) { aoTaramaT = 0; aoTara(); }
+    composer.render();
+  } else renderer.render(scene, camera);
 }
 
 const saat = new THREE.Timer();
 let t = 0, uiAcc = 0, vr = null;
+// ------------------------------------------------------------------ ekran boyutuna göre ayrıntı (LOD)
+// Uzaktan ~1.5 pikselden küçük görünen makine parçaları çizilmez: genel bakışta yüzlerce çizim
+// çağrısı, görüntüde fark yok; yaklaşınca geri gelirler. Makineler kendi `visible` bayraklarını
+// yönettiği için katmanla yapılır: kamera 0. katmanı çizer, uzaktaki küçük parça LOD_KATMAN'a alınır
+// (WebXR 1/2. katmanları sol/sağ göz için kullanır, 7 boş).
+const LOD_KATMAN = 7, LOD_PIKSEL = 1.5;
+let lodT = 0;
+const _lodP = new THREE.Vector3();
+function lodHazirla() {
+  for (const x of makineler) {
+    const liste = [];
+    x.kok.updateMatrixWorld(true);
+    x.kok.traverse((o) => {
+      if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.name === 'sabit') return;
+      if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+      const r = o.matrixWorld.getMaxScaleOnAxis() * o.geometry.boundingSphere.radius;
+      if (r < 0.5) liste.push({ o, r });
+    });
+    liste.sort((a, b) => a.r - b.r);
+    x.lod = { liste, n: 0 };   // liste[0..n) gizli
+  }
+}
+function lodGuncelle(vrde) {
+  // K: 1 m yarıçaplı parçanın LOD_PIKSEL'e düştüğü mesafe → yarıçapı d / K'dan küçük parçalar gizlenir
+  const H = vrde ? 1900 : renderer.domElement.height;
+  const K = H / (2 * Math.tan(THREE.MathUtils.degToRad(vrde ? 45 : camera.fov / 2)) * LOD_PIKSEL);
+  camera.getWorldPosition(_lodP);
+  for (const x of makineler) {
+    if (!x.lod) continue;
+    const esik = x === secili ? 0 : Math.max(0, _lodP.distanceTo(x.kure.center) - x.kure.radius) / K;
+    const L = x.lod.liste;
+    let n = x.lod.n;
+    while (n < L.length && L[n].r < esik * 0.85) L[n++].o.layers.set(LOD_KATMAN);   // %15 histerezis
+    while (n > 0 && L[n - 1].r >= esik) L[--n].o.layers.set(0);
+    x.lod.n = n;
+  }
+}
+
 function dongu(zaman) {
   saat.update(zaman);
   const dt = Math.min(saat.getDelta(), 0.05);
@@ -698,16 +991,21 @@ function dongu(zaman) {
     if (gorusT > 0.25) { gorusT = 0; ekranlariAyarla(); }
     cozunurlukAyarla(dt);
   }
+  onDuvarGuncelle(_cw.z, vrde);
+  lodT += dt;
+  if (lodT > 0.2) { lodT = 0; lodGuncelle(vrde); }
+  scada?.update(dt, t);   // SCADA ekranları (VR'da da)
+  if (cevre) { try { cevre.update(dt, t, vrde); } catch (e) { console.error('[cevre] update', e); cevre = null; } }
   uiAcc += dt;
   if (uiAcc > 0.15) {
     uiAcc = 0;
-    if (secili) panelGuncelle();
+    if (secili && !$('panel').hidden) panelGuncelle();
     document.querySelectorAll('.kart .nokta').forEach((n, i) => {
       const s = makineler[i]?.m.durum().seviye || 'bekliyor';
       if (n.className !== 'nokta ' + s) n.className = 'nokta ' + s;
     });
   }
-  renderer.render(scene, camera);
+  ciz(dt);
 }
 
 await makineleriYukle();
@@ -724,6 +1022,29 @@ if (URLP.get('sabit') !== '0') {
   }
 }
 const golgesiz = kucukGolgeleriKapat();
+// SCADA: arka duvarda fabrika video duvarı + her makinenin arkasında makine ekranı (js/scada.js)
+let scada = null;
+try {
+  const { scadaKur } = await import('./scada.js');
+  scada = scadaKur({ THREE, lib, scene, camera, makineler, binalar: BINALAR,
+    duvar: { x: -31, z: -SALON.z / 2 + 1.05, ry: 0 } });   // kolonların (z −22.4'e dek) önünde
+} catch (e) {
+  console.warn('[scada] kurulamadı, düz tabela konuyor', e);
+  const yazi = lib.levha(['SANAL FABRİKA', 'Kaan Kırşan · Otomasyon & Robotik'], 14, 2.4, { bg: '#17324f', font: 92, px: 1600 });
+  yazi.position.set(-31, 5.4, -SALON.z / 2 + 0.15);
+  scene.add(yazi);
+}
+// Ortam ve canlılık: çatı/armatür/duvar detayları, raflar ve lojistik alanları, güvercinler,
+// koridor AGV'si, holler arası yürüyen işçi (js/cevre.js). Kurulamazsa fabrika olduğu gibi açılır.
+let cevre = null;
+try {
+  const { cevreKur } = await import('./cevre.js');
+  cevre = cevreKur({
+    lib, scene, camera, makineler, duvarMat: SALON_MALZEME.duvar,
+    A: { x0: SALON.x0, x1: SALON.x1, z0: -SALON.z / 2, z1: SALON.z / 2, H: 9 },
+    B: HOL_B,
+  });
+} catch (e) { console.error('[cevre] kurulamadı', e); }
 // VR: masaüstü seçimini sessizce eşitle (kamera uçuşu / HTML panel yok)
 vr = vrKur({
   renderer, scene, camera, controls, makineler, gunes,
@@ -735,6 +1056,8 @@ vr = vrKur({
 const ilk = URLP.get('m');
 const ilkX = ilk && makineler.find((x) => x.m.id === ilk || x.yer.id === ilk);
 sec(ilkX || null, { anlik: true }); // null → ekran yönüne uygun genel bakış
+lodHazirla();   // sabitle + SCADA + çevre kurulduktan sonra: birleşmiş parçalar listeye girmez
 renderer.setAnimationLoop(dongu);
 $('yukleniyor').classList.add('bitti');
-window.__fabrika = { makineler, sec, hazir: true, camera, controls, renderer, golgesiz, vr, sabitIst };
+if (!$('ipucu').hidden) document.querySelector('.ip-kart').classList.add('parla');
+window.__fabrika = { makineler, sec, hazir: true, camera, controls, renderer, golgesiz, vr, sabitIst, cevre, lodGuncelle, LOD_KATMAN, onDuvarGuncelle };

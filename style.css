@@ -59,7 +59,15 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 #panel-ic { overflow-y: auto; padding: 14px 16px 18px; }
 .p-ust { display: flex; align-items: flex-start; gap: 10px; }
 .p-ust h2 { margin: 0; font-size: 18px; line-height: 1.2; }
-.p-ust .kapat { margin-left: auto; background: none; border: none; color: var(--soluk); font-size: 20px; cursor: pointer; }
+.p-dugmeler { margin-left: auto; display: flex; align-items: center; gap: 2px; flex: none; }
+.p-ust .kapat, .p-ust .gizle { background: none; border: none; color: var(--soluk); font-size: 20px; line-height: 1; padding: 2px 6px;
+  border-radius: 6px; cursor: pointer; }
+.p-ust .gizle { font-size: 17px; }
+.p-ust .kapat:hover, .p-ust .gizle:hover { color: #fff; background: #222b35; }
+/* panel gizliyken sağ üstte geri açma düğmesi (seçili makinenin adıyla) */
+#panel-ac { position: fixed; top: 62px; right: 10px; z-index: 15; max-width: 320px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+#panel-ac[hidden] { display: none; }
 .p-kisa { color: var(--soluk); font-size: 13px; margin: 6px 0 10px; line-height: 1.4; }
 .durum { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 9px; border-radius: 999px;
   background: #222b35; font-family: var(--mono); }
@@ -90,16 +98,49 @@ details.cikarim summary { cursor: pointer; font-size: 11px; letter-spacing: 1.5p
 details.cikarim[open] summary { margin-bottom: 8px; }
 
 /* ---------------- alt ipucu, tooltip, yükleniyor */
-#ipucu { position: fixed; left: 50%; transform: translateX(-50%); bottom: 10px; z-index: 10; font-size: 12px; color: var(--soluk);
-  background: rgba(10,14,19,.75); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--cizgi); white-space: nowrap; }
-#ipucu b { color: var(--metin); font-weight: 600; }
+/* kontrol kartı: sol liste ile sağ panel (açıksa) arasındaki alanın altında ortalanır */
+#ipucu { position: fixed; left: 252px; right: 10px; bottom: 12px; z-index: 12; display: flex; justify-content: center; pointer-events: none; }
+body:has(#panel:not([hidden])) #ipucu { right: 380px; }
+#ipucu[hidden], #ipucu-ac[hidden] { display: none; }
+.ip-kart { pointer-events: auto; position: relative; display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 10px 24px; padding: 10px 42px 10px 18px; background: rgba(10,14,19,.88); border: 1px solid #3a4652; border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.35); backdrop-filter: blur(8px); }
+.ip-fare, .ip-dokunma { display: contents; }
+.ip-dokunma { display: none; }
+@media (hover: none) and (pointer: coarse) { .ip-fare { display: none; } .ip-dokunma { display: contents; } }
+.ip-grup { display: flex; align-items: center; gap: 10px; }
+.ip-yazi { display: flex; flex-direction: column; gap: 2px; line-height: 1.25; white-space: nowrap; }
+.ip-yazi b { font-size: 13.5px; color: #fff; font-weight: 600; }
+.ip-yazi span { font-size: 12px; color: var(--soluk); }
+.ip-ikon { width: 24px; height: 30px; color: var(--metin); flex: none; }
+#ipucu kbd { display: inline-grid; place-items: center; box-sizing: border-box; min-width: 26px; height: 26px; padding: 0 6px;
+  font: 600 12.5px var(--mono); color: var(--metin); background: linear-gradient(#2c3742, #1d252e); border: 1px solid #4a5867;
+  border-bottom-width: 3px; border-radius: 6px; transition: transform .06s, background-color .06s, color .06s; }
+.ip-yazi kbd { height: 19px !important; min-width: 0 !important; padding: 0 5px !important; font-size: 10.5px !important;
+  border-bottom-width: 2px !important; margin-right: 3px; vertical-align: 1px; }
+.wasd { display: grid; grid-template-columns: repeat(3, 26px); grid-template-rows: 26px 26px; gap: 3px; }
+.wasd kbd { color: var(--sari) !important; border-color: #6e5d17 !important; }
+.wasd kbd[data-t="w"] { grid-area: 1 / 2; }
+.wasd kbd[data-t="a"] { grid-area: 2 / 1; }
+.wasd kbd[data-t="s"] { grid-area: 2 / 2; }
+.wasd kbd[data-t="d"] { grid-area: 2 / 3; }
+.tuslar { display: flex; gap: 3px; }
+#ipucu kbd.basik { background: var(--sari); color: #111 !important; border-color: #a88600 !important; transform: translateY(2px); }
+.ip-kapat { position: absolute; top: 3px; right: 5px; background: none; border: 0; color: var(--soluk); font-size: 19px; line-height: 1;
+  padding: 4px 6px; cursor: pointer; }
+.ip-kapat:hover { color: #fff; }
+#ipucu-ac { position: fixed; left: 252px; bottom: 12px; z-index: 12; }
+/* ilk açılışta kart birkaç kez parlasın */
+.ip-kart.parla { animation: ipParla 1.4s ease-in-out 3; }
+@keyframes ipParla { 50% { border-color: var(--sari); box-shadow: 0 0 0 3px rgba(242,194,0,.28), 0 6px 24px rgba(0,0,0,.35); } }
+@media (prefers-reduced-motion: reduce) { .ip-kart.parla { animation: none; } }
 #tooltip { position: fixed; z-index: 30; pointer-events: none; background: rgba(10,14,19,.92); border: 1px solid var(--vurgu);
   padding: 4px 9px; border-radius: 6px; font-size: 12.5px; }
 #yukleniyor { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: var(--bg); font-size: 15px;
   letter-spacing: 2px; color: var(--soluk); transition: opacity .5s; }
 #yukleniyor.bitti { opacity: 0; pointer-events: none; }
 
-body.arayuzsuz #ust, body.arayuzsuz #liste, body.arayuzsuz #panel, body.arayuzsuz #ipucu { display: none !important; }
+body.arayuzsuz #ust, body.arayuzsuz #liste, body.arayuzsuz #panel, body.arayuzsuz #ipucu, body.arayuzsuz #ipucu-ac { display: none !important; }
 
 /* ---------------- dar ekran */
 @media (max-width: 900px) {
@@ -114,7 +155,13 @@ body.arayuzsuz #ust, body.arayuzsuz #liste, body.arayuzsuz #panel, body.arayuzsu
   .kart { flex: none; padding: 6px 9px; }
   .kart .ad small { display: none; }
   #panel { top: auto; left: 8px; right: 8px; width: auto; height: 46vh; }
-  #ipucu { display: none; }
+  #ipucu { left: 8px; right: 8px; bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .ip-kart { gap: 8px 16px; padding: 9px 36px 9px 12px; }
+  #ipucu-ac { left: 8px; bottom: calc(10px + env(safe-area-inset-bottom)); }
+  /* panel açıkken ekranın altı panelin: kart da düğme de çekilsin */
+  body:has(#panel:not([hidden])) #ipucu, body:has(#panel:not([hidden])) #ipucu-ac { display: none; }
+  #panel-ac { top: auto; right: 8px; bottom: calc(10px + env(safe-area-inset-bottom)); max-width: 62vw; }
+  body:has(#panel-ac:not([hidden])) #ipucu { bottom: calc(56px + env(safe-area-inset-bottom)); }
 }
 /* yatay telefon: panel altta kalırsa sahneye yer kalmaz, sağa al */
 @media (max-width: 900px) and (orientation: landscape) {

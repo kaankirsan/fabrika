@@ -31,10 +31,11 @@
   </div>
   <div class="bosluk"></div>
   <button id="btn-genel" class="dugme">Genel bakış</button>
-  <button id="btn-saha" class="dugme">Dış saha</button>
+  <button id="btn-saha" class="dugme" title="Konteyner · FK-1000 · Big bag">B Holü</button>
   <button id="btn-vr" class="dugme vr" hidden>VR'a gir</button>
   <label class="anahtar"><input type="checkbox" id="chk-etiket" checked> Etiketler</label>
   <label class="anahtar"><input type="checkbox" id="chk-golge" checked> Gölgeler</label>
+  <label class="anahtar" title="Ortam kapanması (AO), parlama ve yüzey dokusu; yavaş cihazda kendiliğinden kapanır"><input type="checkbox" id="chk-efekt"> Efektler</label>
 </header>
 
 <nav id="liste" aria-label="Makineler"></nav>
@@ -42,11 +43,48 @@
 <aside id="panel" hidden>
   <div id="panel-ic"></div>
 </aside>
+<button id="panel-ac" class="dugme" title="Paneli göster (P)" hidden></button>
 
-<div id="ipucu">
-  <b>Sol tık</b> döndür · <b>sağ tık</b> kaydır · <b>teker</b> yakınlaş · <b>W A S D</b> yürü ·
-  <b>makineye tıkla</b> seç · <b>Q / E</b> önceki / sonraki makine · <b>Esc</b> genel bakış
+<div id="ipucu" role="note" aria-label="Kontroller">
+  <div class="ip-kart">
+    <!-- fare + klavye (masaüstü) -->
+    <div class="ip-fare">
+      <div class="ip-grup">
+        <div class="wasd"><kbd data-t="w">W</kbd><kbd data-t="a">A</kbd><kbd data-t="s">S</kbd><kbd data-t="d">D</kbd></div>
+        <div class="ip-yazi"><b>Yürü</b><span><kbd data-t="shift">Shift</kbd> ile hızlı</span></div>
+      </div>
+      <div class="ip-grup">
+        <svg class="ip-ikon" viewBox="0 0 20 28" aria-hidden="true"><path d="M10 1.5A8.5 8.5 0 0 0 1.5 10v.5H10z" fill="#f2c200"/><rect x="1.5" y="1.5" width="17" height="25" rx="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M1.5 10.5h17M10 1.5v9" stroke="currentColor" stroke-width="1.6"/></svg>
+        <div class="ip-yazi"><b>Sürükle: döndür</b><span>sağ tık kaydır · teker yakınlaş</span></div>
+      </div>
+      <div class="ip-grup">
+        <div class="tuslar"><kbd data-t="q">Q</kbd><kbd data-t="e">E</kbd></div>
+        <div class="ip-yazi"><b>Önceki / sonraki makine</b><span><kbd data-t="escape">Esc</kbd> genel bakış · <kbd data-t="p">P</kbd> panel</span></div>
+      </div>
+      <div class="ip-grup">
+        <svg class="ip-ikon" viewBox="0 0 24 28" aria-hidden="true"><path d="M7 6l13 8.5-5.6 1.3 3.3 6.4-2.6 1.3-3.3-6.4L7 21z" fill="currentColor"/><path d="M3.5 6.5a5 5 0 0 1 5-5M1 9a8 8 0 0 1 4-6.6" fill="none" stroke="#f2c200" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <div class="ip-yazi"><b>Makineye tıkla</b><span>kontrol paneli açılır</span></div>
+      </div>
+    </div>
+    <!-- dokunmatik (telefon / tablet) -->
+    <div class="ip-dokunma">
+      <div class="ip-grup">
+        <svg class="ip-ikon" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="15" r="4.5" fill="#f2c200"/><path d="M5 11a10 10 0 0 1 18 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M23 11l.6-4.2M23 11l-4-1.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <div class="ip-yazi"><b>Tek parmak</b><span>döndür</span></div>
+      </div>
+      <div class="ip-grup">
+        <svg class="ip-ikon" viewBox="0 0 28 28" aria-hidden="true"><circle cx="9.5" cy="18.5" r="4" fill="#f2c200"/><circle cx="18.5" cy="9.5" r="4" fill="#f2c200"/><path d="M5 23l-3 3M23 5l3-3M2 26h4M2 26v-4M26 2h-4M26 2v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <div class="ip-yazi"><b>İki parmak</b><span>yakınlaş · kaydır</span></div>
+      </div>
+      <div class="ip-grup">
+        <svg class="ip-ikon" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="4.5" fill="#f2c200"/><circle cx="14" cy="14" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".8"/><circle cx="14" cy="14" r="12.5" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".4"/></svg>
+        <div class="ip-yazi"><b>Makineye dokun</b><span>kontrol paneli</span></div>
+      </div>
+    </div>
+    <button class="ip-kapat" id="ipucu-kapat" aria-label="Kontrolleri gizle" title="Gizle">×</button>
+  </div>
 </div>
+<button id="ipucu-ac" class="dugme" hidden>⌨ Kontroller</button>
 <div id="tooltip" hidden></div>
 <div id="yukleniyor">Fabrika kuruluyor…</div>
 

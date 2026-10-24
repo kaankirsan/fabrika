@@ -7,7 +7,7 @@
 //    sağ panelin aynısı: kontroller, canlı değerler, trend). Paneldeki düğmelere tetikle
 //    basılır; "basılı tut" düğmeleri tetik bırakılana dek etkin kalır.
 //  - Menü: herhangi bir kumandada YAN TUŞ (grip) → makine listesi; seçilen makinenin
-//    önüne ışınlanır. Menüde salon ortası / dış saha / VR'dan çıkış da var.
+//    önüne ışınlanır. Menüde salon ortası / B holü / VR'dan çıkış da var.
 //  - Performans (Quest): gölge kapalı, sis yakın, uzaktaki makineler çizilmez
 //    (sisin arkasında kalır), ekran dokuları yalnız yakındaki makinelerde güncellenir.
 //    Hedef kare hızının altına düşülürse görüş mesafesi kendiliğinden kısalır.
@@ -18,7 +18,7 @@
 import * as THREE from 'three';
 
 const Y = new THREE.Vector3(0, 1, 0);
-const SINIR = { x0: -104, x1: 132, z0: -34, z1: 32 };      // ışınlanma/yürüme alanı (salon + dış saha)
+const SINIR = { x0: -104, x1: 118, z0: -34, z1: 34 };      // ışınlanma/yürüme alanı (A + B holü, x −106…120)
 
 export function vrKur({ renderer, scene, camera, controls, makineler, gunes, etiketler, masaustuSec, gorunumAyarla, buton }) {
   const rig = new THREE.Group();
@@ -230,7 +230,7 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
     const y = 84 + Math.ceil(makineler.length / kol) * (bh + 8) + 10;
     const ucw = (W - 68 - 28) / 3;
     dugme(p, x, 34, y, ucw, 58, 'Salon ortası', '', () => { menuKapat(); isinlan(new THREE.Vector3(-30, 0, 0), new THREE.Vector3(-30, 0, -10)); });
-    dugme(p, x, 34 + ucw + 14, y, ucw, 58, 'Dış saha', '', () => { menuKapat(); isinlan(new THREE.Vector3(84, 0, 4), new THREE.Vector3(100, 0, 0)); });
+    dugme(p, x, 34 + ucw + 14, y, ucw, 58, 'B Holü', '', () => { menuKapat(); isinlan(new THREE.Vector3(62, 0, 1), new THREE.Vector3(82, 0, -8)); });
     dugme(p, x, 34 + 2 * (ucw + 14), y, ucw, 58, "VR'dan çık", 'dur', () => renderer.xr.getSession()?.end());
     p.tex.needsUpdate = true;
   }

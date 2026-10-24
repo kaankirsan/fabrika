@@ -18,8 +18,13 @@ Güncellemek için bu klasörde: `git add -A && git commit -m "..." && git push`
 | Makineye tıkla / soldaki liste | Makineyi seç, sağda kontrol paneli |
 | 1–9 | İlk dokuz makineye git |
 | Q / E | Önceki / sonraki makine |
-| Esc | Genel bakış |
-| "Dış saha" | Konteyner · FK-1000 · Big bag |
+| Esc / panelde × | Genel bakış |
+| P / panelde ⟩ | Paneli gizle-göster (kamera makinede kalır) |
+| "B Holü" | Konteyner · FK-1000 · Big bag (A holünün doğusu, geniş geçitten yürünür) |
+| "Efektler" | Gölgelendirme (AO) + parlama; kare hızı düşerse kendiliğinden kapanır, `?efekt=0` kapatır |
+
+Alttaki kontrol kartı × ile küçülür ("⌨ Kontroller" ile geri gelir); basılan tuş kartta yanar.
+Telefonda tek parmak döndürür, iki parmak yakınlaştırır/kaydırır.
 
 ## Quest (VR)
 1. `FABRIKA VR AC.bat` çalıştır (ilk seferde Windows güvenlik duvarı sorarsa **Özel ağ**'a izin ver).
@@ -35,7 +40,7 @@ Güncellemek için bu klasörde: `git add -A && git commit -m "..." && git push`
 | Tetik → zemin | Oraya ışınlan |
 | Tetik → makine | Önünde kontrol paneli açılır |
 | Tetik → panel düğmesi | Bas (basılı tut düğmeleri tetik bırakılana dek etkin) |
-| Yan tuş (grip) | Makine listesi menüsü (seçilen makinenin önüne ışınlar) · salon ortası · dış saha · VR'dan çık |
+| Yan tuş (grip) | Makine listesi menüsü (seçilen makinenin önüne ışınlar) · salon ortası · B holü · VR'dan çık |
 
 VR'da performans için gölgeler kapalı ve uzak makineler sisin arkasında çizilmez;
 kare hızı düşerse görüş mesafesi kendiliğinden kısalır.

@@ -1,4 +1,4 @@
-// js/machines/konteyner.js — Güneş Enerjili Konteyner (mobil enerji ünitesi, dış saha).
+// js/machines/konteyner.js — Güneş Enerjili Konteyner (mobil enerji ünitesi, B holü).
 //
 // Kaan'ın tarifi (2026-10-23) + container-img-01/02, container-video-01:
 //  - Konteynerin TEK uzun yanı (+Z) açık. İçeride 16 yaprak dik paket halinde
@@ -15,8 +15,8 @@
 //    Kurulum tersi: kamyon gelir → ayaklar yere basar, konteyner kalkar → kamyon
 //    çıkar → konteyner yere alçalır → paneller açılır.
 //
-// Yerleşim: dış saha; yerel X = konteyner uzun ekseni ve kamyon yolu (+X'ten
-// gelir), +Z = açık yan ve panel dizisi.
+// Yerleşim: B holü (fabrikada ry = π/2); yerel X = konteyner uzun ekseni ve kamyon yolu
+// (+X'ten gelir → holün arka duvarındaki RAMPA 1 kapısı), +Z = açık yan ve panel dizisi.
 
 export function create(lib) {
   const {
@@ -29,7 +29,7 @@ export function create(lib) {
   const ZEMIN = 0.05;                          // gövde altı, yerdeyken
   const DECK = 1.32;                           // dorse yatak (twistlock) yüksekliği
   const KALK = 1.58;                           // dorsenin altından geçebileceği kaldırma
-  const UZAK = 60;                             // kamyonun ufukta kaybolduğu yerel x
+  const UZAK = 34;                             // kamyonun kapı dışındaki rampada beklediği yerel x (tamamen dışarıda)
   const FX = L / 2 + 0.2, FZ = W / 2 + 0.25;   // uç çerçeve dikmeleri (genişliğin dışında)
 
   // panel dizisi (akordeon)
@@ -762,6 +762,7 @@ export function create(lib) {
       'Uçlardaki siyah çerçeve dikmeleri ve altlarındaki krom miller → 4 hidrolik ayak; dikmeler gövdenin dışında olduğu için dorse aralarından geçebilir.',
       'TAHMİN: yaprak sayısı 16 (8 üçgen), yaprak boyu 2.15 m, tam açık eğim 22°, ray sayısı 2, hidromotorun yeri (açık yanın alt kenarı), kaldırma yüksekliği 1.58 m, dorse yatağı 1.32 m, panel gücü 64 × 550 W.',
       'TAHMİN: saha rayları kurulum yerinde serili kabul edildi (konteynerle taşınmıyor). Süreler hızlandırıldı.',
+      'Sanal fabrikada gösterim için B holüne alındı: kamyon holün arka duvarındaki RAMPA 1 kapısından geri geri girer, kapı önündeki asfaltta bekler.',
       'TAHMİN: operatörün kamyona yol göstermesi ve dizi açılışını izlemesi temsili iş akışı; fotoğraflarda saha operatörü görünmüyor.',
     ],
     group: g,

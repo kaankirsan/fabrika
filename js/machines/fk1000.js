@@ -8,10 +8,11 @@
 //  - global ışıklar (hemisphere + güneş + rim) YOK — fabrikanın ışıkları kullanılır;
 //    robotun küçük durum ışığı (PointLight) duruyor
 //  - bina gövdesi, komşu binalar, güneş diski/hale YOK; çatı 46×30 yerine 28×16
-//  - hortum uç noktaları dünya yerine S-yerel çerçevede (kök fabrikada (100,0,16)'da)
+//  - hortum uç noktaları dünya yerine S-yerel çerçevede (kök fabrikada B holünde (88,0,18)'de)
 //  - kare başına sabit artışlar (sprey, parçacık, operatör takibi, leke silme)
 //    canlıdaki 60 fps adımına göre dt ile ölçeklendi; tick 1/60 s alt adımlarla koşar
-//  - üstüne fabrika katmanı: başlat/durdur, mod, temizlik modu, hızlar, martı gönder,
+//  - martılar → güvercin (lib.guvercin; hol içinde kirişlerden süzülerek alçalır)
+//  - üstüne fabrika katmanı: başlat/durdur, mod, temizlik modu, hızlar, güvercin gönder,
 //    kenar sensörü testi, ACİL; ROTTEST ekranında canlı telemetri kartı
 //
 // Yönelim canlıdaki gibi: bigPanelGroup.rotation.x = -tilt → panelin +Z kenarı YÜKSEK;
@@ -483,7 +484,10 @@ export function create(lib) {
   const brand = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.07, 0.005), cabAccent);
   brand.position.set(0, 0.78, 0.281); rottest.add(brand);
   // Filter tubes (clear vertical cylinders along the side)
-  const filterMat = new THREE.MeshPhysicalMaterial({ color: 0xa5b0c5, roughness: 0.2, metalness: 0.3, transmission: 0.3, transparent: true, opacity: 0.85 });
+  // transmission KULLANMA: görünür tek bir transmission malzemesi three.js'te tüm opak sahneyi
+  // ikinci kez çizdirir (genel bakışta 2330 → 4553 çağrı, VR'da göz başına). Yarı saydam
+  // standart malzeme + ortam yansıması aynı "şeffaf filtre kabı" görüntüsünü verir.
+  const filterMat = new THREE.MeshStandardMaterial({ color: 0xb4bfd2, roughness: 0.12, metalness: 0.2, transparent: true, opacity: 0.55, depthWrite: false });
   for (let i = 0; i < 3; i++){
     const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.85, 16), filterMat);
     tube.position.set(0.6, 0.55, -0.18 + i * 0.18); rottest.add(tube);
@@ -787,70 +791,13 @@ export function create(lib) {
   trail.position.set(0, 0.07, 0);
   frontRow.add(trail);
 
-  // ─── Seagull + droppings ────────────────────────────────────────────────
-  const featherMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, side: THREE.DoubleSide });
-  const beakMat    = new THREE.MeshStandardMaterial({ color: 0xffaa30, roughness: 0.7 });
-  const eyeMat     = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4 });
-
-  function makeWingArm() {
-    const shoulder = new THREE.Group();
-    const innerShape = new THREE.Shape();
-    innerShape.moveTo(0, -0.10);
-    innerShape.bezierCurveTo(0.20, -0.16, 0.45, -0.10, 0.55, -0.04);
-    innerShape.lineTo(0.55, 0.04);
-    innerShape.bezierCurveTo(0.40, 0.18, 0.20, 0.20, 0, 0.16);
-    innerShape.closePath();
-    const inner = new THREE.Mesh(new THREE.ShapeGeometry(innerShape), featherMat);
-    inner.rotation.x = -Math.PI / 2;
-    inner.rotation.z = Math.PI / 2;
-    shoulder.add(inner);
-    const elbow = new THREE.Group();
-    elbow.position.set(0, 0, 0.55);
-    shoulder.add(elbow);
-    const outerShape = new THREE.Shape();
-    outerShape.moveTo(0, -0.04);
-    outerShape.bezierCurveTo(0.20, -0.10, 0.35, -0.06, 0.42, -0.02);
-    outerShape.lineTo(0.42, 0.04);
-    outerShape.bezierCurveTo(0.35, 0.14, 0.20, 0.12, 0, 0.10);
-    outerShape.closePath();
-    const outer = new THREE.Mesh(new THREE.ShapeGeometry(outerShape), featherMat);
-    outer.rotation.x = -Math.PI / 2;
-    outer.rotation.z = Math.PI / 2;
-    elbow.add(outer);
-    shoulder.userData = { elbow };
-    return shoulder;
-  }
-
+  // ─── Güvercin + pislik ──────────────────────────────────────────────────
+  // FABRİKA: canlı sitedeki martılar burada (hol içinde) güvercin: lib.guvercin() modeli.
+  // Uçuş çatı kirişleri yüksekliğinden (~8 m) süzülerek panelin üstüne alçalır, pisliği bırakıp
+  // yeniden yükselir; durum makinesi / pislik / silme döngüsü canlı koddakiyle aynı.
   function makeBird(initialDelay) {
-    const seagull = new THREE.Group();
-    const bird_body = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), featherMat);
-    bird_body.scale.set(1.6, 0.7, 0.65);
-    seagull.add(bird_body);
-    const bird_head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 12), featherMat);
-    bird_head.position.set(0.26, 0.04, 0); seagull.add(bird_head);
-    const bird_beak = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.15, 10), beakMat);
-    bird_beak.rotation.z = -Math.PI/2;
-    bird_beak.position.set(0.40, 0.02, 0); seagull.add(bird_beak);
-    const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 6), eyeMat);
-    eyeL.position.set(0.30, 0.07, 0.07); seagull.add(eyeL);
-    const eyeR = eyeL.clone(); eyeR.position.z = -0.07; seagull.add(eyeR);
-    const tailShape = new THREE.Shape();
-    tailShape.moveTo(0, 0);
-    tailShape.lineTo(-0.30, 0.14);
-    tailShape.lineTo(-0.34, 0);
-    tailShape.lineTo(-0.30, -0.14);
-    tailShape.closePath();
-    const tail = new THREE.Mesh(new THREE.ShapeGeometry(tailShape), featherMat);
-    tail.rotation.x = -Math.PI/2;
-    tail.position.set(-0.20, 0.0, 0);
-    seagull.add(tail);
-    const wingL = makeWingArm();
-    wingL.position.set(0, 0.05, 0.04);
-    seagull.add(wingL);
-    const wingR = makeWingArm();
-    wingR.position.set(0, 0.05, -0.04);
-    wingR.scale.z = -1;
-    seagull.add(wingR);
+    const guv = lib.guvercin({ olcek: 0.85 });
+    const seagull = guv.group;
     seagull.visible = false;
     S.add(seagull);
 
@@ -870,7 +817,7 @@ export function create(lib) {
     S.add(drop);
 
     return {
-      group: seagull, wingL, wingR, splat, drop,
+      group: seagull, guv, splat, drop,
       state: {
         nextSpawn: initialDelay,
         flying: false,
@@ -930,7 +877,7 @@ export function create(lib) {
   let hiz = 1.2;                 // m/s (canlıdaki speed)
   let kenarKapali = false;
   let jog = 0;
-  let tAnim = 0;                 // canlıdaki clock.getElapsedTime() (hep akar: martılar)
+  let tAnim = 0;                 // canlıdaki clock.getElapsedTime() (hep akar: kuşlar)
   let tSure = 0;                 // çalışma süresi (telemetri "Süre")
   let leke = 0;
   let uyariMetin = '', uyariT = 0;
@@ -1001,10 +948,9 @@ export function create(lib) {
     trail.position.x = robot.position.x + dir * trailLen / 2;
     trail.material.opacity = 0.35 + Math.abs(Math.sin(t * 1.6)) * 0.15;
 
-    // ─── Seagull flyby + splat lifecycle (3 birds) ──────────────────────
+    // ─── Güvercin geçişi + pislik döngüsü (3 kuş; canlıda martı) ─────────
     for (const b of birds) {
       const seagull = b.group; const st = b.state;
-      const wingL = b.wingL; const wingR = b.wingR;
       const splat = b.splat; const drop = b.drop;
 
       if (!st.flying && t >= st.nextSpawn) {
@@ -1027,22 +973,21 @@ export function create(lib) {
         } else {
           const startX = st.dirX > 0 ? -18 : 18;
           const endX   = st.dirX > 0 ?  18 : -18;
+          // FABRİKA: kirişlerden süzülerek alçalır (ortada en alçak), sonra yükselir; burun yola göre eğilir
+          const SUZ = 3.6;
           seagull.position.x = THREE.MathUtils.lerp(startX, endX, u);
-          seagull.position.y = st.altitude + Math.sin(u * Math.PI) * 0.5;
+          seagull.position.y = st.altitude + (1 - Math.sin(u * Math.PI)) * SUZ;
           seagull.position.z = st.zDrift + Math.sin(u * Math.PI * 2 + st.flapPhase) * 1.2;
-          seagull.rotation.y = st.dirX > 0 ? 0 : Math.PI;
-          const flap = Math.sin(t * 6 + st.flapPhase) * 0.7;
-          const lag  = Math.sin(t * 6 - 0.5 + st.flapPhase) * 0.5;
-          wingL.rotation.x = flap;
-          wingR.rotation.x = flap;
-          if (wingL.userData.elbow) wingL.userData.elbow.rotation.x = -lag * 0.6;
-          if (wingR.userData.elbow) wingR.userData.elbow.rotation.x = -lag * 0.6;
+          seagull.rotation.set(0, st.dirX > 0 ? 0 : Math.PI, Math.atan2(-SUZ * Math.PI * Math.cos(u * Math.PI), Math.abs(endX - startX)));
+          // alçalırken süzülür, düzlükte ve tırmanırken çırpar
+          if (u > 0.08 && u < 0.34) b.guv.suzul(0.2); else b.guv.kanat(t, st.flapPhase, 0.8, 10);
           yerel(frontRow, frontRowWorld);
           const seaLocalX = seagull.position.x - frontRowWorld.x;
           if (!st.dropped && Math.abs(seaLocalX - st.splatX) < 0.4) {
             st.dropped = true;
             st.falling = true;
             st.fallStart = t;
+            st.dropY = seagull.position.y;
             drop.position.set(frontRowWorld.x + st.splatX, seagull.position.y, frontRowWorld.z);
             drop.visible = true;
           }
@@ -1058,7 +1003,7 @@ export function create(lib) {
           st.splatActive = true;
         } else {
           yerel(frontRow, frontRowWorld);
-          const startY = st.altitude + 0.5;
+          const startY = st.dropY ?? st.altitude + 0.5;
           drop.position.y = THREE.MathUtils.lerp(startY, frontRowWorld.y + 0.04, fu);
         }
       }
@@ -1218,9 +1163,9 @@ export function create(lib) {
       get: () => temizlik, set: (v) => (temizlik = v) },
     { tip: 'kaydirici', metin: 'Fırça hızı', min: 0, max: 300, adim: 10, birim: 'dev/dk', get: () => fircaRpm, set: (v) => (fircaRpm = v) },
     { tip: 'kaydirici', metin: 'Robot hızı', min: 0.2, max: 2.0, adim: 0.1, birim: 'm/s', get: () => hiz, set: (v) => (hiz = v) },
-    { tip: 'butonlar', ogeler: [{ metin: 'Martı gönder', tik: () => {
+    { tip: 'butonlar', ogeler: [{ metin: 'Güvercin gönder', tik: () => {
       const b = birds.filter((x) => !x.state.flying).sort((a, c) => a.state.nextSpawn - c.state.nextSpawn)[0];
-      if (b) b.state.nextSpawn = tAnim; else uyar('ÜÇ MARTI DA HAVADA');
+      if (b) b.state.nextSpawn = tAnim; else uyar('ÜÇ GÜVERCİN DE HAVADA');
     } }] },
     { tip: 'baslik', metin: 'Güvenlik' },
     { tip: 'anahtar', metin: 'Kenar sensörünü devre dışı bırak (test)', get: () => kenarKapali, set: (v) => (kenarKapali = v) },
@@ -1257,18 +1202,19 @@ export function create(lib) {
       'Operatör ucundaki kırmızı LED bar robotun gittiği yöne kayar',
       'Hortum: tank → ROTTEST → makara sabit; makara → operatör → robot hortumu robotu izleyerek her karede yeniden şekillenir',
       'Operatör robotla aynı hizada yürür, sarı telsiz kumandayı tutar',
-      'Martılar geçerken panele pislik bırakır; robot üstünden geçince silinir (sayaç)',
+      'Güvercinler holün kirişlerinden süzülüp panelin üstünden geçerken pislik bırakır; robot üstünden geçince silinir (sayaç)',
     ],
     cikarim: [
-      'dokamuh.com ana sayfasındaki hero sahnesinden (scene.js / scene-worker.js) birebir aktarıldı: panel, ızgara, robot, fırçalar, LED\'ler, operatör ve DOKA logosu, kumanda, tank/ROTTEST/makara, hortum geometrisi, sprey, iz, martılar ve tüm tick() animasyonu aynı kod.',
+      'dokamuh.com ana sayfasındaki hero sahnesinden (scene.js / scene-worker.js) birebir aktarıldı: panel, ızgara, robot, fırçalar, LED\'ler, operatör ve DOKA logosu, kumanda, tank/ROTTEST/makara, hortum geometrisi, sprey, iz, kuş geçişleri ve tüm tick() animasyonu aynı kod.',
+      'Sanal fabrikada B holüne alındı: çatı plakası + parapetler holün içinde çatı maketi / test platformu olarak duruyor; sitedeki martılar fabrika içine uygun güvercinlere çevrildi (aynı pislik → silme döngüsü).',
       'Değişenler: çatı 46×30 yerine 28×16; sitenin kendi ışıkları (sıcak gün batımı + mavi rim), sis, güneş diski, alttaki bina ve komşu binalar YOK — fabrika ışığıyla görünüyor; fare paralaksı/kamera kayması yok.',
-      'Eklenenler (fabrika katmanı): başlat/durdur, yarı otomatik/manuel sürüş, ıslak/kuru/hibrit, fırça ve robot hızı, martı gönder, kenar sensörü testi (kapalıyken düşme alarmı), ACİL; ROTTEST ekranında sitedeki telemetri kartı.',
+      'Eklenenler (fabrika katmanı): başlat/durdur, yarı otomatik/manuel sürüş, ıslak/kuru/hibrit, fırça ve robot hızı, güvercin gönder, kenar sensörü testi (kapalıyken düşme alarmı), ACİL; ROTTEST ekranında sitedeki telemetri kartı.',
       'Yönelim sitedeki gibi: panelin yüksek kenarı (+Z) operatör, tank ve makara tarafında.',
       'Robot gövdesi other-machines-img-06 ve fuar fotoğrafına göre yeniden modellendi (canlı sitedeki kutu gövde yerine): SİMETRİK yamuk kesitli gri şasi (Kaan: robot simetrik; iki uzun yanda da eğik siyah bant ve alt paslanmaz ray), eğik siyah bantlar (paslanmaz ayırıcılar, "Max Pressure 50 BAR" ve "Lifting hazard" etiketleri), alt paslanmaz ray ve boydan boya siyah fırça, iki uçta boru taşıma kolu, sol uçta turuncu telsiz kumanda, kontrol kutusu (kırmızı/yeşil buton, ACİL STOP, anahtar, doka logosu, QR), kaz boynu konnektörü (hortum buraya bağlanır), tutamaklı batarya kapağı, arka üstte ve ön altta 3\'er mavi kenar sensörü, operatör ucunda kırmızı LED bar.',
       'TAHMİN (robot ölçüleri): 1.35 m boy × 0.55 m derinlik × ~0.30 m yükseklik, iki fırça Ø140 mm; donanım konumları üstten fotoğraftan oranlandı. Hortumun kaz boynu konnektörüne bağlandığı varsayıldı.',
     ],
     group: root,
-    // sabitle(): robot, operatör, dinamik hortum tüpleri, ıslak iz, martılar/damla/lekeler hareketli;
+    // sabitle(): robot, operatör, dinamik hortum tüpleri, ıslak iz, güvercinler/damla/lekeler hareketli;
     // tank çıkışı, ROTTEST vanaları ve makara yanakları her karede konumları OKUNAN çapalar (hortum)
     sabitHaric: [robot, operator, robotHoseTube.mesh, reelOperatorTube.mesh, trail,
       outlet, inletV, outletV, drumSideL, drumSideR, ...birds.flatMap((b) => [b.group, b.splat, b.drop])],

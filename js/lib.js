@@ -144,14 +144,164 @@ export class Sira {
   sifirla() { this.i = 0; this.t = 0; this.bitti = false; this.adimlar[0]?.basla?.(); }
 }
 
+// ------------------------------------------------------------------ yüzey detayı (kalite)
+// Tek paylaşılan 256² tekrarlı gürültü dokusu: R ince tane, G orta ölçek leke, B fırça izi.
+// Malzemeye onBeforeCompile ile NESNE uzayında üç düzlemli (triplanar) örneklenen yükseklik
+// (türev tabanlı bump, metre cinsinden) + pürüzlülük varyasyonu eklenir: UV gerekmez, kutu
+// yüzlerinde gerilme olmaz, sabitle() ile birleşen geometride de parçaya yapışık kalır.
+// kalite.detay.value = 0 iken (VR / telefon) tekdüze dal atlanır → ek maliyet yok.
+// main.js açılışta kalite.anisotropi'yi GPU'nun azami değerine çeker.
+export const kalite = { anisotropi: 8, detay: { value: 1 } };
+// p: [ölçek (doku tekrarı / m), yükseklik genliği (m), sönme uzaklığı (m)]
+// h: yükseklik için R,G,B,A ağırlıkları · r: pürüzlülük varyasyonu (±oran) ağırlıkları
+const DETAY = {
+  boya:  { p: [4, 0.00025, 16], h: [0.85, 0.15, 0, 0], r: [0.04, 0.09, 0, 0] }, // fırın boya portakal kabuğu + hafif leke
+  metal: { p: [2, 0.00012, 12], h: [0.1, 0, 0.9, 0], r: [0.03, 0.08, 0.2, 0] }, // fırçalanmış çelik / alüminyum
+  kaba:  { p: [6, 0.0003, 10], h: [1, 0, 0, 0], r: [0.08, 0.1, 0, 0] },         // kauçuk, karton, ahşap, mat siyah
+  beton: { p: [0.5, 0.0015, 40], h: [0.55, 0.45, 0, 0], r: [0.06, 0.22, 0, 0] }, // zemin
+};
+let _detayTex = null;
+function detayDokusu() {
+  if (_detayTex) return _detayTex;
+  const N = 256, data = new Uint8Array(N * N * 4);
+  let tohum = 12345;
+  const rnd = () => (tohum = (tohum * 16807) % 2147483647) / 2147483647;
+  // periyodik (N'ye sarmalı) değer gürültüsü: fx × fy kafes, yumuşak adım ile ara değer
+  const okt = (fx, fy) => {
+    const g = new Float32Array(fx * fy); for (let i = 0; i < g.length; i++) g[i] = rnd();
+    return (u, v) => {
+      const x = u * fx, y = v * fy, x0 = Math.floor(x), y0 = Math.floor(y);
+      let sx = x - x0, sy = y - y0; sx = sx * sx * (3 - 2 * sx); sy = sy * sy * (3 - 2 * sy);
+      const X0 = x0 % fx, X1 = (x0 + 1) % fx, Y0 = (y0 % fy) * fx, Y1 = ((y0 + 1) % fy) * fx;
+      const a = g[Y0 + X0], b = g[Y0 + X1], c = g[Y1 + X0], d = g[Y1 + X1];
+      return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+    };
+  };
+  const kanal = (oktlar) => { const t = oktlar.reduce((s, o) => s + o[1], 0); return (u, v) => oktlar.reduce((s, o) => s + o[0](u, v) * o[1], 0) / t; };
+  const R = kanal([[okt(32, 32), 1], [okt(64, 64), 0.6], [okt(128, 128), 0.35]]);
+  const G = kanal([[okt(4, 4), 1], [okt(8, 8), 0.55], [okt(16, 16), 0.3]]);
+  const B = kanal([[okt(3, 96), 1], [okt(6, 192), 0.6], [okt(2, 256), 0.4]]);
+  const ger = (v, k) => Math.max(0, Math.min(255, Math.round((0.5 + (v - 0.5) * k) * 255)));
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const u = x / N, v = y / N, i = (y * N + x) * 4;
+    data[i] = ger(R(u, v), 2.2); data[i + 1] = ger(G(u, v), 2.4); data[i + 2] = ger(B(u, v), 2.4); data[i + 3] = 255;
+  }
+  const t = new THREE.DataTexture(data, N, N, THREE.RGBAFormat, THREE.UnsignedByteType);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true;
+  t.anisotropy = kalite.anisotropi;
+  t.needsUpdate = true;
+  return (_detayTex = t);
+}
+const DETAY_VS_UST = /* glsl */`
+varying vec3 vDetayPos;
+varying vec3 vDetayNrm;`;
+const DETAY_FS_UST = /* glsl */`
+uniform sampler2D tDetay;
+uniform float uDetay;
+uniform vec3 uDetayP;
+uniform vec4 uDetayH;
+uniform vec4 uDetayR;
+varying vec3 vDetayPos;
+varying vec3 vDetayNrm;
+// Mikkelsen türev tabanlı bump (normalleştirilmemiş türevler → h metre cinsinden gerçek eğim)
+vec3 detayBump( vec3 p, vec3 n, float h, float yon ) {
+  vec3 sx = dFdx( p ), sy = dFdy( p );
+  vec3 r1 = cross( sy, n ), r2 = cross( n, sx );
+  float det = dot( sx, r1 ) * yon;
+  vec3 grad = sign( det ) * ( dFdx( h ) * r1 + dFdy( h ) * r2 );
+  return normalize( abs( det ) * n - grad );
+}`;
+const DETAY_FS_ORNEK = /* glsl */`
+vec4 detayT = vec4( 0.5 );
+float detayS = 0.0;
+if ( uDetay > 0.5 ) {
+  vec3 dw = pow( abs( normalize( vDetayNrm ) ), vec3( 4.0 ) ); dw /= dw.x + dw.y + dw.z + 1e-5;
+  vec3 dp = vDetayPos * uDetayP.x;
+  detayT = texture2D( tDetay, dp.yz ) * dw.x + texture2D( tDetay, dp.zx ) * dw.y + texture2D( tDetay, dp.xy ) * dw.z;
+  detayS = 1.0 - smoothstep( uDetayP.z * 0.4, uDetayP.z, length( vViewPosition ) );
+}
+#include <roughnessmap_fragment>
+roughnessFactor = clamp( roughnessFactor * ( 1.0 + dot( detayT - 0.5, uDetayR ) * 2.0 * mix( 0.45, 1.0, detayS ) ), 0.03, 1.0 );`;
+const DETAY_FS_NORMAL = /* glsl */`
+#include <normal_fragment_maps>
+if ( uDetay > 0.5 ) normal = detayBump( - vViewPosition, normal, dot( detayT, uDetayH ) * uDetayP.y * detayS, faceDirection );`;
+
+export function detayEkle(m, profil = 'boya') {
+  const P = DETAY[profil] || DETAY.boya;
+  m.userData.detay = profil;
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.tDetay = { value: detayDokusu() };
+    sh.uniforms.uDetay = kalite.detay;   // tüm malzemelerde ortak anahtar
+    sh.uniforms.uDetayP = { value: new THREE.Vector3(...P.p) };
+    sh.uniforms.uDetayH = { value: new THREE.Vector4(...P.h) };
+    sh.uniforms.uDetayR = { value: new THREE.Vector4(...P.r) };
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>' + DETAY_VS_UST)
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvDetayPos = transformed;\nvDetayNrm = objectNormal;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>' + DETAY_FS_UST)
+      .replace('#include <roughnessmap_fragment>', DETAY_FS_ORNEK)
+      .replace('#include <normal_fragment_maps>', DETAY_FS_NORMAL);
+  };
+  m.customProgramCacheKey = () => 'detay1';   // hepsi aynı programı paylaşır (değerler uniform)
+  return m;
+}
+
+// Endüstriyel cilalı beton / epoksi zemin malzemesi (salon zeminleri için ortak).
+// 1024² renk dokusu bir derz karesini (varsayılan 6 m) kaplar; üstüne nesne uzayında iki ölçekli
+// (≈23 m ve ≈7 m) makro leke/parlaklık varyasyonu eklenir → 6 m'lik tekrar desen olarak seçilmez.
+// Hafif parlak (roughness ~0.5): ortam haritasındaki tavan ışıkları zeminde yumuşak yansır.
+// Kullanım: mesh = new THREE.Mesh(new THREE.PlaneGeometry(Lx, Lz), zeminMalzemesi({ tekrar: [Lx / 6, Lz / 6] }))
+export function zeminMalzemesi({ tekrar = [1, 1], renk = '#8e9295', puruz = 0.52, derz = true } = {}) {
+  const map = canvasTex(1024, 1024, (x, w, h) => {
+    x.fillStyle = renk; x.fillRect(0, 0, w, h);
+    // yumuşak çok ölçekli lekeler (açık/koyu), mala izi yayları
+    for (let i = 0; i < 260; i++) {
+      const r = 20 + Math.random() ** 2 * 260, cx = Math.random() * w, cy = Math.random() * h;
+      const koyu = Math.random() < 0.55, a = 0.018 + Math.random() * 0.035;
+      const gr = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+      gr.addColorStop(0, koyu ? `rgba(40,42,44,${a})` : `rgba(235,236,232,${a})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = gr; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill();
+    }
+    x.lineWidth = 1.2;
+    for (let i = 0; i < 70; i++) {
+      x.strokeStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '30,30,30'},${0.02 + Math.random() * 0.03})`;
+      const cx = Math.random() * w, cy = Math.random() * h, r = 60 + Math.random() * 180, a0 = Math.random() * 6.28;
+      x.beginPath(); x.arc(cx, cy, r, a0, a0 + 0.6 + Math.random()); x.stroke();
+    }
+    // ince tane
+    const id = x.getImageData(0, 0, w, h), d = id.data;
+    for (let i = 0; i < d.length; i += 4) { const n = (Math.random() - 0.5) * 9; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+    x.putImageData(id, 0, 0);
+    if (derz) { x.strokeStyle = 'rgba(38,38,38,.35)'; x.lineWidth = 2.5; x.strokeRect(0, 0, w, h); }
+  }, { tekrar });
+  const m = new THREE.MeshStandardMaterial({ map, roughness: puruz, metalness: 0 });
+  detayEkle(m, 'beton');
+  const detayDerle = m.onBeforeCompile;
+  m.onBeforeCompile = (sh, r) => {
+    detayDerle(sh, r);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+{ vec2 zq = vDetayPos.xy;
+  float mk = texture2D( tDetay, zq * 0.043 ).g * 0.6 + texture2D( tDetay, zq * 0.137 + 0.37 ).g * 0.4;
+  diffuseColor.rgb *= 0.9 + mk * 0.2; }`);
+  };
+  m.customProgramCacheKey = () => 'zemin1';
+  return m;
+}
+
 // ------------------------------------------------------------------ malzemeler
+// o.detay: 'boya' | 'metal' | 'kaba' | 'beton' | false (yoksa metal/pürüzlülükten seçilir)
 const matCache = new Map();
 export function mat(color, o = {}) {
-  const key = color + '|' + (o.r ?? '') + '|' + (o.m ?? '') + '|' + (o.key ?? '');
+  const key = color + '|' + (o.r ?? '') + '|' + (o.m ?? '') + '|' + (o.key ?? '') + '|' + (o.detay ?? '');
   if (!o.yeni && matCache.has(key)) return matCache.get(key);
   const m = new THREE.MeshStandardMaterial({
     color, roughness: o.r ?? 0.6, metalness: o.m ?? 0.1, ...(o.ek || {}),
   });
+  if (o.detay !== false && !m.transparent) {
+    detayEkle(m, o.detay || (m.metalness >= 0.6 ? 'metal' : m.roughness >= 0.85 ? 'kaba' : 'boya'));
+  }
   if (!o.yeni) matCache.set(key, m);
   return m;
 }
@@ -328,7 +478,7 @@ export function canvasTex(w, h, ciz, { tekrar = null, srgb = true } = {}) {
   const t = new THREE.CanvasTexture(c);
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   if (tekrar) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(tekrar[0], tekrar[1]); }
-  t.anisotropy = 4;
+  t.anisotropy = kalite.anisotropi;   // eğik bakılan zemin/tabela yazıları bulanıklaşmasın
   return t;
 }
 
@@ -439,7 +589,7 @@ export class Ekran {
     this.ctx = this.canvas.getContext('2d');
     this.tex = new THREE.CanvasTexture(this.canvas);
     this.tex.colorSpace = THREE.SRGBColorSpace;
-    this.tex.anisotropy = 4;
+    this.tex.anisotropy = kalite.anisotropi;
     this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(wM, hM), new THREE.MeshBasicMaterial({ map: this.tex, toneMapped: false }));
     this.mesh.userData.ayri = true;   // sabitle() birleştirmesin (görünürlük filtresi kök grubu bulmalı)
   }
@@ -740,4 +890,134 @@ export function pano(parent, x, y, z, w = 0.8, h = 1.2, d = 0.3, ry = 0) {
   box(0.02, 0.12, 0.02, M.koyu, w * 0.4, h / 2, d / 2 + 0.02, g); // kol
   parent.add(g);
   return g;
+}
+
+// ------------------------------------------------------------------ güvercin
+// Fabrika içi kuşlar (FK-1000 panel pisliği, ortam güvercinleri). Yerel: +X baş, +Y yukarı,
+// kanatlar ±Z. Tüm parçalar köşe renkli TEK malzemeyi ve önbellekteki geometrileri paylaşır
+// → kuş başına 6 çizim (gövde, bacaklar, 2×iç kanat, 2×dış kanat). Gerçek boyun ~1.3 katı (olcek 1).
+//   const k = guvercin(); sahne.add(k.group);
+//   uçuş: k.kanat(t, faz)   (bacaklar gizlenir)     tünemiş/yerde: k.kapat()   gagalama: k.egil(0…1)
+//   k.yerden: ayak tabanının kuş merkezine göre yüksekliği (yere koyarken group.position.y = zemin + yerden)
+let _guv = null;
+function guvercinParcalari() {
+  if (_guv) return _guv;
+  const C = {
+    gri: 0x8e949c, acik: 0xa9aeb4, koyu: 0x4c535d, kafa: 0x5f6875, yesil: 0x3f7f6c, mor: 0x6d5a8e,
+    gaga: 0x2e3135, ser: 0xe8e3d8, goz: 0xe27a2a, ayak: 0xc24f5c, kanat: 0x9aa0a8, ucluk: 0x5d646e, bant: 0x3a4048,
+  };
+  const _c = new THREE.Color();
+  // geometriye düz köşe rengi + dönüşüm (birleştirme için hepsi indeksli, position/normal/uv/color)
+  const parca = (geo, renk, m) => {
+    _c.setHex(renk);
+    const n = geo.attributes.position.count, a = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { a[i * 3] = _c.r; a[i * 3 + 1] = _c.g; a[i * 3 + 2] = _c.b; }
+    geo.setAttribute('color', new THREE.BufferAttribute(a, 3));
+    if (m) geo.applyMatrix4(m);
+    return geo;
+  };
+  const T = (x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) => new THREE.Matrix4().compose(
+    new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(sx, sy, sz));
+  const tTuy = T(-0.185, -0.005, 0, 1, 1, 1, 0, 0, 0.1);           // kuyruk ekseni (hafif aşağı)
+  const govde = mergeGeometries([
+    parca(new THREE.SphereGeometry(0.1, 16, 12), C.gri, T(0, 0, 0, 1.55, 0.92, 0.88)),
+    parca(new THREE.SphereGeometry(0.08, 14, 10), C.acik, T(0.025, -0.03, 0, 1.45, 0.72, 0.95)),   // açık karın
+    parca(new THREE.SphereGeometry(0.062, 14, 10), C.yesil, T(0.11, 0.048, 0, 1, 1.18, 1.02)),     // boyun (yeşil yanardöner)
+    parca(new THREE.SphereGeometry(0.05, 12, 8), C.mor, T(0.135, 0.03, 0, 0.85, 0.8, 1.2)),        // göğüs mor parıltı
+    parca(new THREE.SphereGeometry(0.05, 14, 10), C.kafa, T(0.175, 0.1, 0)),                       // kafa
+    parca(new THREE.ConeGeometry(0.013, 0.05, 8), C.gaga, T(0.237, 0.094, 0, 1, 1, 1, 0, 0, -Math.PI / 2)),
+    parca(new THREE.SphereGeometry(0.013, 8, 6), C.ser, T(0.218, 0.105, 0)),                       // gaga üstü beyaz ser
+    parca(new THREE.SphereGeometry(0.0095, 8, 6), C.goz, T(0.192, 0.112, 0.036)),
+    parca(new THREE.SphereGeometry(0.0095, 8, 6), C.goz, T(0.192, 0.112, -0.036)),
+    parca(new THREE.BoxGeometry(0.15, 0.014, 0.085), C.gri, tTuy),                                // kuyruk
+    parca(new THREE.BoxGeometry(0.035, 0.016, 0.087), C.bant, tTuy.clone().multiply(T(-0.06, 0.001, 0))), // kuyruk ucu koyu bant
+  ]);
+  const bacak = mergeGeometries([0.032, -0.032].flatMap((z) => [
+    parca(new THREE.CylinderGeometry(0.008, 0.007, 0.06, 6), C.ayak, T(0.0, -0.11, z)),
+    parca(new THREE.BoxGeometry(0.045, 0.008, 0.03), C.ayak, T(0.012, -0.142, z)),
+  ]));
+  // kanatlar: şekil (s = açıklık, c = kiriş) → yerel (x = c, y = 0, z = s); normal +Y
+  const SK = new THREE.Matrix4().set(0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1);
+  const sekil = (noktalar, renk, dy = 0) => {
+    const s = new THREE.Shape();
+    noktalar.forEach(([a, b], i) => (i ? s.lineTo(a, b) : s.moveTo(a, b)));
+    s.closePath();
+    return parca(new THREE.ShapeGeometry(s), renk, new THREE.Matrix4().makeTranslation(0, dy, 0).multiply(SK));
+  };
+  const ic = mergeGeometries([
+    sekil([[0, 0.045], [0.07, 0.058], [0.14, 0.052], [0.205, 0.036], [0.205, -0.07], [0.14, -0.095], [0.07, -0.098], [0, -0.085]], C.kanat),
+    sekil([[0.05, -0.03], [0.2, -0.026], [0.2, -0.04], [0.05, -0.044]], C.bant, 0.002),     // iki koyu kanat bandı
+    sekil([[0.05, -0.058], [0.2, -0.054], [0.2, -0.068], [0.05, -0.072]], C.bant, 0.002),
+  ]);
+  const dis = sekil([[0, 0.036], [0.08, 0.04], [0.15, 0.026], [0.215, -0.008], [0.2, -0.04], [0.13, -0.068], [0.06, -0.078], [0, -0.07]], C.ucluk);
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.05, side: THREE.DoubleSide });
+  _guv = { govde, bacak, ic, dis, mat };
+  return _guv;
+}
+
+export function guvercin({ olcek = 1 } = {}) {
+  const P = guvercinParcalari();
+  const g = new THREE.Group();
+  const ust = new THREE.Group();                   // gövde + kanatlar (gagalarken öne eğilir)
+  g.add(ust);
+  const govde = new THREE.Mesh(P.govde, P.mat);
+  ust.add(govde);
+  const bacak = new THREE.Mesh(P.bacak, P.mat);
+  g.add(bacak);
+  const kanatYap = (s) => {                        // s = +1 (+Z kanadı) / −1 (aynalı)
+    const omuz = new THREE.Group();
+    omuz.scale.z = s;
+    omuz.add(new THREE.Mesh(P.ic, P.mat));
+    const dirsek = new THREE.Group();
+    dirsek.position.z = 0.2;
+    omuz.add(dirsek);
+    dirsek.add(new THREE.Mesh(P.dis, P.mat));
+    omuz.userData = { elbow: dirsek, s };
+    ust.add(omuz);
+    return omuz;
+  };
+  const wingL = kanatYap(1), wingR = kanatYap(-1);
+  g.scale.setScalar(olcek);
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  g.userData.hareketli = true;
+
+  // Euler XYZ: rotation.x kanadı uzun eksen (gövde X) etrafında kaldırır; aynalı kanatta işaret ters
+  const ac = (w) => { w.position.set(0.02, 0.045, 0.035 * w.userData.s); w.scale.set(1, 1, w.userData.s); w.rotation.set(0, 0, 0); };
+  const api = {
+    group: g, ust, govde, bacak, wingL, wingR, yerden: 0.146 * olcek,
+    // uçuş çırpışı: omuz yukarı-aşağı, dirsek gecikmeli kıvrılır
+    kanat(t, faz = 0, genlik = 0.8, hiz = 9) {
+      ust.rotation.z = 0; bacak.visible = false;
+      const f = Math.sin(t * hiz + faz) * genlik + 0.12, e = Math.sin(t * hiz + faz - 0.7) * genlik * 0.55;
+      for (const w of [wingL, wingR]) {
+        if (w.userData.kapali) { ac(w); w.userData.kapali = false; }
+        w.rotation.x = -f * w.userData.s;
+        w.userData.elbow.rotation.x = -e * w.userData.s;
+      }
+    },
+    // süzülme: kanatlar açık, hafif yukarı (V)
+    suzul(aci = 0.18) {
+      bacak.visible = false;
+      for (const w of [wingL, wingR]) {
+        if (w.userData.kapali) { ac(w); w.userData.kapali = false; }
+        w.rotation.x = -aci * w.userData.s; w.userData.elbow.rotation.x = -aci * 0.4 * w.userData.s;
+      }
+    },
+    // tünemiş / yerde: kanatlar gövdenin üstüne geriye katlanır, bacaklar görünür
+    kapat() {
+      bacak.visible = true;
+      for (const w of [wingL, wingR]) {
+        const s = w.userData.s;
+        w.position.set(0.03, 0.06, 0.055 * s);
+        w.scale.set(1, 1, 0.68 * s);            // katlı kanat gövde boyunda
+        w.rotation.set(0.5 * s, -Math.PI / 2 * s, 0);
+        w.userData.elbow.rotation.x = 0;
+        w.userData.kapali = true;
+      }
+    },
+    // gagalama / eğilme (0 dik … 1 baş yerde)
+    egil(k) { ust.rotation.z = -0.62 * k; ust.position.y = -0.02 * k; },
+  };
+  ac(wingL); ac(wingR);
+  return api;
 }

@@ -21,6 +21,7 @@ Güncellemek için bu klasörde: `git add -A && git commit -m "..." && git push`
 | Esc / panelde × | Genel bakış |
 | P / panelde ⟩ | Paneli gizle-göster (kamera makinede kalır) |
 | "B Holü" | Konteyner · FK-1000 · Big bag (A holünün doğusu, geniş geçitten yürünür) |
+| C Holü (B'nin doğusu, koridor ekseninde geçit) | Ar-Ge & BT: sunucu odası, e-bisiklet, İHA, elektrikli araç |
 | "Efektler" | Gölgelendirme (AO) + parlama; kare hızı düşerse kendiliğinden kapanır, `?efekt=0` kapatır |
 
 Alttaki kontrol kartı × ile küçülür ("⌨ Kontroller" ile geri gelir); basılan tuş kartta yanar.
@@ -40,7 +41,7 @@ Telefonda tek parmak döndürür, iki parmak yakınlaştırır/kaydırır.
 | Tetik → zemin | Oraya ışınlan |
 | Tetik → makine | Önünde kontrol paneli açılır |
 | Tetik → panel düğmesi | Bas (basılı tut düğmeleri tetik bırakılana dek etkin) |
-| Yan tuş (grip) | Makine listesi menüsü (seçilen makinenin önüne ışınlar) · salon ortası · B holü · VR'dan çık |
+| Yan tuş (grip) | Makine listesi menüsü (seçilen makinenin önüne ışınlar) · salon ortası · B holü · C holü · VR'dan çık |
 
 VR'da performans için gölgeler kapalı ve uzak makineler sisin arkasında çizilmez;
 kare hızı düşerse görüş mesafesi kendiliğinden kısalır.

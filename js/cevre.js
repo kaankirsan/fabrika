@@ -1,4 +1,4 @@
-// js/cevre.js — fabrika ortamı ve canlılık (A + B holü).
+// js/cevre.js — fabrika ortamı ve canlılık (A + B + C holü).
 //
 // Bina: çatı makasları + aşıklar + trapez sac çatı altı + ışıklık bantları + yüksek tavan LED
 // armatürleri + havalandırma kanalları + ön kolonlar + ışık huzmeleri/toz. Hepsi "çatı" grubunda:
@@ -19,7 +19,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/BufferGeometryUtils.js';
 
-export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = null }) {
+export function cevreKur({ lib, scene, camera, makineler = [], A, B, C = null, duvarMat = null }) {
   const { box, cyl, mat, M } = lib;
   const PI = Math.PI;
   const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _d = new THREE.Vector3();
@@ -31,12 +31,12 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
 
   const kok = new THREE.Group(); kok.name = 'cevre'; scene.add(kok);
   const cati = new THREE.Group(); cati.name = 'cevre-cati'; kok.add(cati);
-  const catiH = { A: new THREE.Group(), B: new THREE.Group() };
-  catiH.A.name = 'cevre-cati-A'; catiH.B.name = 'cevre-cati-B';
-  cati.add(catiH.A, catiH.B);
-  const parca = { A: new THREE.Group(), B: new THREE.Group() };
-  parca.A.name = 'cevre-A'; parca.B.name = 'cevre-B';
-  kok.add(parca.A, parca.B);
+  const catiH = { A: new THREE.Group(), B: new THREE.Group(), C: new THREE.Group() };
+  catiH.A.name = 'cevre-cati-A'; catiH.B.name = 'cevre-cati-B'; catiH.C.name = 'cevre-cati-C';
+  cati.add(catiH.A, catiH.B, catiH.C);
+  const parca = { A: new THREE.Group(), B: new THREE.Group(), C: new THREE.Group() };
+  parca.A.name = 'cevre-A'; parca.B.name = 'cevre-B'; parca.C.name = 'cevre-C';
+  kok.add(parca.A, parca.B, parca.C);
   const genel = new THREE.Group(); genel.name = 'cevre-ornek'; kok.add(genel);   // instanced, iki hol
 
   // ---------------------------------------------------------------- örnekleme yardımcısı
@@ -66,12 +66,16 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
   }
   // Hol başına ayrı InstancedMesh (VR'da uzak holün örnekleri de gizlenebilsin): örneğin x'ine göre dağıtır
   class Cift {
-    constructor(...a) { this.A = new Ornek(...a); this.B = new Ornek(...a); }
-    sec(x) { return x < B.x0 ? this.A : this.B; }
+    constructor(...a) { this.A = new Ornek(...a); this.B = new Ornek(...a); this.C = new Ornek(...a); }
+    sec(x) { return x < B.x0 ? this.A : C && x >= C.x0 ? this.C : this.B; }
     kutu(x, ...r) { this.sec(x).kutu(x, ...r); }
     kiris(a, b, ...r) { this.sec((a.x + b.x) / 2).kiris(a, b, ...r); }
     ekle(m, renk) { _p.setFromMatrixPosition(m); this.sec(_p.x).ekle(m, renk); }
-    kur(gA, gB, ad) { this.A.kur(gA, ad + '-A'); this.B.kur(gB, ad + '-B'); }
+    // C holünün örnekleri, B'ye verilen grubun C karşılığına (parça / çatı) gider
+    kur(gA, gB, ad) {
+      this.A.kur(gA, ad + '-A'); this.B.kur(gB, ad + '-B');
+      this.C.kur(gB === catiH.B ? catiH.C : gB === parca.B ? parca.C : gB, ad + '-C');
+    }
   }
 
   // ---------------------------------------------------------------- malzemeler
@@ -120,8 +124,14 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
     if (b) isaretle(b.x - 7, b.x + 5.6, B.z0, b.z + 10.1, 'bigbag-senaryo');
     if (f) isaretle(f.x - 18.8, f.x + 19, f.z - 9.2, f.z + 10.8, 'fk1000-senaryo');
   }
-  isaretle(A.x0, B.x1, -2.5, 2.5, 'koridor');
+  isaretle(A.x0, C ? C.x1 : B.x1, -2.5, 2.5, 'koridor');
   isaretle(B.x0 - 6, B.x0 + 6.5, B.gecit[0] - 0.5, B.gecit[1] + 0.5, 'gecit');
+  if (C) {
+    isaretle(C.x0 - 6, C.x0 + 6, C.gecit[0] - 0.5, C.gecit[1] + 0.5, 'gecit-C');
+    // C holü içerik alanları (sunucu odası; e-bisiklet, İHA, elektrikli araç + arkalarındaki SCADA ayakları)
+    isaretle(125, 155, -21, -5, 'alan-sunucu');
+    isaretle(122.5, 159.5, 5.5, 18.5, 'alan-projeler');
+  }
 
   // İşçi rotası (A batı ucundaki bakım tezgâhı ↔ A ön şeridi ↔ geçit ↔ B ofisi ↔ mola köşesi)
   const ROTA = [
@@ -229,7 +239,7 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
   const lensGeo = new THREE.CircleGeometry(0.27, 12); lensGeo.rotateX(PI / 2);   // aşağı bakar
   const lensIM = new Cift(lensGeo, mat(0xfff6e8, { r: 0.3, key: 'cevre-lens', detay: false, ek: { emissive: 0xfff3e2, emissiveIntensity: 2.6 } }), { golge: false, al: false });
   const askiIM = new Cift(new THREE.CylinderGeometry(0.012, 0.012, 1, 5), M.siyah, { golge: false, al: false });
-  const huzmeGeo = { A: [], B: [] }, tozBolge = [];
+  const huzmeGeo = { A: [], B: [], C: [] }, tozBolge = [];
   const catiBilgi = [];
   // Sac çatı altı (trapez profil çizgileri): iki holde tek malzeme, UV metre/0.25
   const sacDoku = lib.canvasTex(64, 4, (x, w) => {
@@ -241,7 +251,7 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
   sacDoku.wrapS = sacDoku.wrapT = THREE.RepeatWrapping;
   const sacMat = new THREE.MeshStandardMaterial({ map: sacDoku, color: 0xd2d6da, roughness: 0.55, metalness: 0.25,
     emissive: 0x262a2f, side: THREE.DoubleSide });
-  const sacGeo = { A: [], B: [] };
+  const sacGeo = { A: [], B: [], C: [] };
 
   function catiKur(h) {
     const cg = catiH[h.ad];
@@ -346,8 +356,8 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
       cg.add(m);
     }
   }
-  // güneş yönü (main.js: ışık (42,52,22) → hedef (14,0,0)): huzmeler zemine bu yönde iner
-  const GUNES = (() => { const v = new THREE.Vector3(14 - 42, -52, 0 - 22); return { x: v.x / -v.y, z: v.z / -v.y }; })();
+  // güneş yönü (main.js: ışık (55,52,22) → hedef (27,0,0), yön (−28,−52,−22)): huzmeler zemine bu yönde iner
+  const GUNES = (() => { const v = new THREE.Vector3(-28, -52, -22); return { x: v.x / -v.y, z: v.z / -v.y }; })();
 
   // makinelerin dünya kutuları (armatür/toz yerleşimi için)
   for (const mk of makineler) { mk.kutu = new THREE.Box3().setFromObject(mk.kok); }
@@ -355,7 +365,8 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
   const kolonA = []; for (let x = A.x0 + 7.5; x <= A.x1 - 7; x += 15) kolonA.push(x);
   const kapiB = [...B.kapilar].sort((a, b) => a - b), kwB = B.kapiW / 2;
   const kolonBarka = []; for (let x = B.x0 + 6; x <= B.x1 - 4; x += 12) if (!kapiB.some((k) => Math.abs(x - k) < kwB + 1)) kolonBarka.push(x);
-  const kolonBdogu = []; for (let z = B.z0 + 12; z <= B.z1 - 6; z += 12) kolonBdogu.push(z);
+  const kolonBdogu = []; for (let z = B.z0 + 12; z <= B.z1 - 6; z += 12) if (!C || z <= C.gecit[0] - 1 || z >= C.gecit[1] + 1) kolonBdogu.push(z);
+  const kolonC = []; if (C) for (let x = C.x0 + 5; x <= C.x1 - 4; x += 10) kolonC.push(x);   // main.js C kolonları
   const makasB = []; for (let x = B.x0 + 6; x <= B.x1 - 4; x += 12) makasB.push(x);
 
   catiKur({ ad: 'A', x0: A.x0, x1: A.x1, z0: A.z0, z1: A.z1, H: A.H, d: 1.6, panel: 16, ch: 0.2, wb: 0.08, makasX: kolonA,
@@ -364,6 +375,9 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
   catiKur({ ad: 'B', x0: B.x0, x1: B.x1, z0: B.z0, z1: B.z1, H: B.H, d: 2.3, panel: 24, ch: 0.24, wb: 0.1, makasX: makasB,
     isiklikZ: [-21, 0, 21], isiklikW: 2.0, huzme: [1, 3, 5], armZ: [-27, -15, -3, 9, 21, 31], armX0: 4, armAra: 7.5,
     kanalZ: [-31.5, 32.5], alin: [[B.x0, -1], [B.x1, 1]] });
+  if (C) catiKur({ ad: 'C', x0: C.x0, x1: C.x1, z0: C.z0, z1: C.z1, H: C.H, d: 1.6, panel: 16, ch: 0.2, wb: 0.08, makasX: kolonC,
+    isiklikZ: [-10, 10], isiklikW: 1.8, huzme: [1, 3], armZ: [-17, -6, 6, 17], armX0: 4, armAra: 7.5,
+    kanalZ: [-21.2, 21.2], alin: [[C.x1, 1]] });
   catiCelik.kur(catiH.A, catiH.B, 'cevre-makas');
   isiklikIM.kur(catiH.A, catiH.B, 'cevre-isiklik');
   armIM.kur(catiH.A, catiH.B, 'cevre-armatur'); lensIM.kur(catiH.A, catiH.B, 'cevre-lens'); askiIM.kur(catiH.A, catiH.B, 'cevre-aski');
@@ -376,7 +390,7 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
     const huzmeMat = new THREE.MeshBasicMaterial({
       map: hd, transparent: true, opacity: 0.075, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
     });
-    for (const h of ['A', 'B']) {
+    for (const h of C ? ['A', 'B', 'C'] : ['A', 'B']) {
       const sac = new THREE.Mesh(mergeGeometries(sacGeo[h]), sacMat);
       sac.name = 'cevre-sac-' + h;
       catiH[h].add(sac);
@@ -448,7 +462,8 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
   cikisKapisi(parca.A, -76, zA, 0);
   cikisKapisi(parca.A, 14, zA, 0);
   cikisKapisi(parca.A, A.x0 + 0.125, 4.5, PI / 2);
-  cikisKapisi(parca.B, B.x1 - 0.125, -1.5, -PI / 2);   // koridorun doğu ucu (z = 0'daki kolonun yanında)
+  if (C) cikisKapisi(parca.C, C.x1 - 0.125, -1.5, -PI / 2);   // koridorun doğu ucu (C holü; B'deki yer artık geçit)
+  else cikisKapisi(parca.B, B.x1 - 0.125, -1.5, -PI / 2);
   cikisKapisi(parca.B, 82, zBa, 0);
 
   // yangın tüpleri (kolon / duvar üstünde) + levha
@@ -464,7 +479,16 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
   tup(B.x0 - 0.125, B.gecit[0] - 1.4, -PI / 2);
   tup(B.x0 + 0.125, B.gecit[1] + 1.4, PI / 2);
   tup(A.x0 + 0.125, 10.8, PI / 2);
-  tup(B.x1 - 0.125, 1.25, -PI / 2);
+  if (C) {
+    tup(C.x1 - 0.125, 1.25, -PI / 2);
+    tup(C.x0 + 0.125, C.gecit[1] + 1.4, PI / 2);                    // C geçidinin iki yanı
+    tup(C.x0 - 0.125, C.gecit[0] - 1.4, -PI / 2);
+    for (const x of kolonC.filter((x, i) => i % 2 === 1)) tup(x, C.z0 + 0.38 + 0.25, 0);
+    cikisKapisi(parca.C, C.x0 + 22, C.z0 + 0.125, 0);                // kuzey duvarı
+    levha('baret', 0.5, 0.5, C.x0 - 0.135, C.gecitH + 0.15, C.gecit[1] + 1.6, -PI / 2);
+    levha('kulak', 0.5, 0.5, C.x0 + 0.135, C.gecitH + 0.15, C.gecit[0] - 1.6, PI / 2);
+    levha('agv', 0.6, 0.6, C.x1 - 0.135, 2.2, 2.8, -PI / 2);
+  } else tup(B.x1 - 0.125, 1.25, -PI / 2);
 
   // uyarı levhaları
   levha('baret', 0.5, 0.5, B.x0 - 0.135, B.gecitH + 0.15, B.gecit[0] - 1.6, -PI / 2);
@@ -516,6 +540,7 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
   for (const xd of [-61.0, -1.0]) golgesiz(box(0.3, 8.35 - 2.1, 0.08, galvaniz, xd, (8.35 + 2.1) / 2, A.z0 + 0.38 + 0.22, parca.A));
   tava(parca.B, B.x0 + 0.3, B.x1 - 0.3, B.z0 + 0.38 + 0.42, 8.4);
   tava(parca.B, B.z0 + 0.8, B.z1 - 0.3, B.x1 - 0.38 - 0.42, 8.4, 'z');
+  if (C) tava(parca.C, C.x0 + 0.3, C.x1 - 0.3, C.z0 + 0.38 + 0.42, 7.4);
   golgesiz(box(0.08, 8.4 - 2.1, 0.3, galvaniz, B.x0 + 0.17, (8.4 + 2.1) / 2, -24, parca.B));
   function havaHatti(g, x0, x1, z, y, dususX) {
     const k = cyl(0.035, x1 - x0, havaMat, (x0 + x1) / 2, y, z, g, { eksen: 'x', seg: 10 }); golgesiz(k);
@@ -527,6 +552,7 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
   }
   havaHatti(parca.A, A.x0 + 0.3, A.x1 - 0.3, A.z0 + 0.38 + 0.29, 3.4, [-83.1, -53.1, -8.1, 21.9, 36.9]);
   havaHatti(parca.B, B.x0 + 0.3, B.x1 - 0.3, B.z0 + 0.38 + 0.29, 6.6, kolonBarka.filter((x) => x !== 64).map((x) => x + 0.4));
+  if (C) havaHatti(parca.C, C.x0 + 0.3, C.x1 - 0.3, C.z0 + 0.38 + 0.29, 3.4, [C.x0 + 15.4, C.x1 - 4.6]);
 
   // ================================================================= LOJİSTİK
   // seçici palet rafı: yerel +X boyunca göz (2.7 m), derinlik +Z (1.1 m, ön = koridor tarafı)
@@ -583,9 +609,10 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
     rafYer('A', 22.25, 35.75, zr, zr + 1.1, 'raf-A2', () => raf('A', 22.25, zr, 0, 5));
     const xr = B.x1 - 0.38 - 0.27 - 0.08;   // kolon iç yüzünün önü (raf arkası)
     const ryB = -PI / 2;                     // yerel +X → dünya +Z, ön → −X
-    // koridor ucunda (z ±2.5) raf yok: orada acil çıkış kapısı
-    rafYer('B', xr - 1.1, xr, -33.3, -3.6, 'raf-B1', () => raf('B', xr, -33.3, ryB, 11));
-    rafYer('B', xr - 1.1, xr, 3.0, 32.7, 'raf-B2', () => raf('B', xr, 3.0, ryB, 11));
+    // koridor ucunda C holü geçidi (z −8…8): raf hatları geçidin iki yanında biter (C yoksa çıkış kapısı)
+    const gB = C ? 8 : 11, zB2 = C ? C.gecit[1] + 1.5 : 3.0;
+    rafYer('B', xr - 1.1, xr, -33.3, -33.3 + gB * 2.7, 'raf-B1', () => raf('B', xr, -33.3, ryB, gB));
+    rafYer('B', xr - 1.1, xr, zB2, zB2 + gB * 2.7, 'raf-B2', () => raf('B', xr, zB2, ryB, gB));
   }
 
   // A batı ucu — bakım atölyesi
@@ -906,6 +933,7 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
 
   // koridorda AGV durak işaretleri
   const DURAK = [{ x: -60, z: -1 }, { x: B.x0 + 18, z: -1 }, { x: 40, z: 1 }, { x: -80, z: 1 }];
+  if (C) DURAK.push({ x: C.x0 + 20, z: -1 });   // sunucu odası önü
   for (const d of DURAK) zeminYazi('agvdurak', 1.3, 0.32, d.x, d.z < 0 ? -1.85 : 1.85, d.z < 0 ? 0 : PI);
 
   // lastik izleri (koridor şeritleri, B raf koridoru, kamyon şeritleri) — tek saydam çizim
@@ -928,7 +956,8 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
       g.rotateX(-PI / 2); g.rotateY(-Math.atan2(z1 - z0, x1 - x0)); g.translate((x0 + x1) / 2, 0.003, (z0 + z1) / 2);
       geos.push(g);
     };
-    serit(A.x0 + 6, -1, B.x1 - 8, -1, 0.85); serit(A.x0 + 6, 1, B.x1 - 8, 1, 0.85);
+    const izX1 = (C ? C.x1 : B.x1) - 8;
+    serit(A.x0 + 6, -1, izX1, -1, 0.85); serit(A.x0 + 6, 1, izX1, 1, 0.85);
     serit(B.x1 - 6.4, B.z0 + 2, B.x1 - 6.4, B.z1 - 2, 1.6);
     for (const k of kapiB) serit(k, B.z0 + 0.3, k, B.z0 + 24, 2.6);
     const iz = new THREE.Mesh(mergeGeometries(geos), new THREE.MeshStandardMaterial({
@@ -955,12 +984,14 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
     c.name = 'cevre-cam'; c.renderOrder = 3;
     parca.B.add(c);
   }
-  const birlesim = { A: lib.sabitle(parca.A), B: lib.sabitle(parca.B), catiA: lib.sabitle(catiH.A), catiB: lib.sabitle(catiH.B) };
+  const birlesim = { A: lib.sabitle(parca.A), B: lib.sabitle(parca.B), C: lib.sabitle(parca.C),
+    catiA: lib.sabitle(catiH.A), catiB: lib.sabitle(catiH.B), catiC: lib.sabitle(catiH.C) };
   // VR uzaklık kırpması için hol sınırları
   const BOLGE = [
     { g: [parca.A, catiH.A], x0: A.x0, x1: A.x1, z0: A.z0, z1: A.z1 },
     { g: [parca.B, catiH.B], x0: B.x0, x1: B.x1, z0: B.z0, z1: B.z1 },
   ];
+  if (C) BOLGE.push({ g: [parca.C, catiH.C], x0: C.x0, x1: C.x1, z0: C.z0, z1: C.z1 });
 
   // ================================================================= GÜVERCİNLER
   // Kuklalar sahnede değil: her kare kukla iskeleti pozlanır, dünya matrisleri 4 InstancedMesh'e
@@ -969,15 +1000,22 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
     A: { x0: A.x0 + 1.5, x1: A.x1 - 1.5, z0: A.z0 + 1.5, z1: A.z1 - 1.5, ucus: 8.55 },
     B: { x0: B.x0 + 1.5, x1: B.x1 - 1.5, z0: B.z0 + 1.5, z1: B.z1 - 1.5, ucus: 9.6 },
   };
+  if (C) HOL.C = { x0: C.x0 + 1.5, x1: C.x1 - 1.5, z0: C.z0 + 1.5, z1: C.z1 - 1.5, ucus: 8.55 };
   // duvar üstü tünekleri (iç yarı)
   for (const x of [-100, -88, -79, -64, -49, -15, 2, 18, 31, 41]) tunekler.A.push({ p: new THREE.Vector3(x, A.H, A.z0 + 0.06), yaw: -PI / 2 });
   for (const z of [-17, -6, 12, 20]) tunekler.A.push({ p: new THREE.Vector3(A.x0 + 0.06, A.H, z), yaw: 0 });
   for (const x of [50, 68, 80, 92, 110, 116]) tunekler.B.push({ p: new THREE.Vector3(x, B.H, B.z0 + 0.06), yaw: -PI / 2 });
   for (const z of [-28, -16, 6, 18, 30]) tunekler.B.push({ p: new THREE.Vector3(B.x1 - 0.06, B.H, z), yaw: PI });
+  if (C) {
+    tunekler.C = [];
+    for (const x of [124, 133, 142, 151, 157]) tunekler.C.push({ p: new THREE.Vector3(x, C.H, C.z0 + 0.06), yaw: -PI / 2 });
+    for (const z of [-15, -4, 9, 19]) tunekler.C.push({ p: new THREE.Vector3(C.x1 - 0.06, C.H, z), yaw: PI });
+  }
   const ZEMIN = {
     A: [[-90, 21.4, 1.3], [-20, 21.5, 1.6], [12, 21.5, 1.4], [-50, 21.4, 1.4], [-93, 10.8, 0.8]],
     B: [[B.x0 + 16, 24.2, 1.6], [100, 31.8, 1.8], [B.x1 - 6.4, -19, 1.4], [B.x0 + 4, -18, 1.2]],
   };
+  if (C) ZEMIN.C = [[C.x0 + 4, 21.5, 1.2], [C.x1 - 3.5, -21.5, 1.2], [C.x1 - 3, 21, 1.2]];
   const NK = 12;
   const kukla0 = lib.guvercin();
   const gIM = {
@@ -997,7 +1035,7 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
     const k = i === 0 ? kukla0 : lib.guvercin();
     k.group.rotation.order = 'YZX';
     const b = {
-      k, hol: i < 8 ? 'A' : 'B', durum: 'tunek', t: 0, sure: ara(3, 25), faz: rnd() * 6.28,
+      k, hol: C ? (i < 7 ? 'A' : i < 10 ? 'B' : 'C') : (i < 8 ? 'A' : 'B'), durum: 'tunek', t: 0, sure: ara(3, 25), faz: rnd() * 6.28,
       p: new THREE.Vector3(), yaw: 0, egil: 0, tunek: null, yurHedef: null, gaga: 0, ucus: null,
       icL: k.wingL.children.find((c) => c.isMesh), icR: k.wingR.children.find((c) => c.isMesh),
       disL: k.wingL.userData.elbow.children[0], disR: k.wingR.userData.elbow.children[0],
@@ -1139,7 +1177,7 @@ export function cevreKur({ lib, scene, camera, makineler = [], A, B, duvarMat = 
     g.add(spot);
     lib.sabitle(g, [tepe, led, spot]);
     kok.add(g);
-    const x0 = A.x0 + 9, x1 = B.x1 - 11, r = 1.0, L1 = x1 - x0, La = PI * r, LT = 2 * L1 + 2 * La;
+    const x0 = A.x0 + 9, x1 = C ? C.x1 - 9 : B.x1 - 11, r = 1.0, L1 = x1 - x0, La = PI * r, LT = 2 * L1 + 2 * La;
     const nokta = (s, o) => {
       s = ((s % LT) + LT) % LT;
       if (s < L1) return o.set(x0 + s, -r, 1, 0);

@@ -50,6 +50,12 @@ const YERLESIM = [
   { id: 'disacma',   x: -60,   z: 10,  ry: Math.PI },
   { id: 'yikama',    x: -75,   z: 10,  ry: Math.PI },
   { id: 'pompatest', x: 31,    z: -10, ry: 0 },
+  // C holü (Ar-Ge & BT): web & veri altyapısı — kuzey yarı
+  { id: 'sunucu',    x: 140,   z: -13, ry: 0 },
+  // C holü (Ar-Ge & BT): kişisel / üniversite projeleri — güney sırası
+  { id: 'ebisiklet', x: 128,   z: 11,  ry: Math.PI },
+  { id: 'iha',       x: 141,   z: 11,  ry: Math.PI },
+  { id: 'earac',     x: 154,   z: 11,  ry: Math.PI },
 ];
 
 // ------------------------------------------------------------------ renderer
@@ -78,7 +84,7 @@ scene.environmentIntensity = 0.55;
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.05, 900);
 // genel bakış: A + B holü birlikte (x −106…120); "B Holü" düğmesi: B holüne güneydoğudan
-const GENEL = { poz: new THREE.Vector3(18, 116, 184), hedef: new THREE.Vector3(18, 0, -4) };
+const GENEL = { poz: new THREE.Vector3(28, 137, 216), hedef: new THREE.Vector3(28, 0, -4) };   // A + B + C holü
 const SAHA_GORUNUM = { poz: new THREE.Vector3(104, 64, 86), hedef: new THREE.Vector3(84, 0, -4) };
 camera.position.copy(GENEL.poz);
 
@@ -88,17 +94,21 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.maxPolarAngle = Math.PI * 0.49;
 controls.minDistance = 1.2;
-controls.maxDistance = 280;
+controls.maxDistance = 320;   // genel bakışlar (A+B+C) ~260–280 m
 controls.screenSpacePanning = false; // zemin düzleminde kaydır
 controls.update();
 
 // Dikey ekranda (telefon) 152 m'lik salon yandan bakışta ince bir şerit kalıyor:
 // salonu boylamasına, batı ucundan yukarıdan gör.
-const GENEL_DIKEY = { poz: new THREE.Vector3(-172, 196, 3), hedef: new THREE.Vector3(-12, 0, 2) };
+const GENEL_DIKEY = { poz: new THREE.Vector3(-184, 214, 3), hedef: new THREE.Vector3(-4, 0, 2) };
 const SAHA_DIKEY = { poz: new THREE.Vector3(83, 150, 62), hedef: new THREE.Vector3(83, 0, -2) };
 const dikey = () => window.innerWidth < window.innerHeight * 0.9;
 const genelGorunum = () => (dikey() ? GENEL_DIKEY : GENEL);
 const sahaGorunum = () => (dikey() ? SAHA_DIKEY : SAHA_GORUNUM);
+// C holü (Ar-Ge & BT, x 120…160, z ±24)
+const C_GORUNUM = { poz: new THREE.Vector3(154, 38, 50), hedef: new THREE.Vector3(145, 0, -2) };
+const C_DIKEY = { poz: new THREE.Vector3(140, 112, 42), hedef: new THREE.Vector3(140, 0, -1) };
+const cGorunum = () => (dikey() ? C_DIKEY : C_GORUNUM);
 
 // Görüntü merkezini sol liste (~250 px) ile sağ panel (~370 px, açıksa)
 // arasındaki serbest alanın ortasına kaydır: makine panelin arkasında kalmasın.
@@ -139,14 +149,15 @@ window.addEventListener('resize', gorunumAyarla);
 
 // ------------------------------------------------------------------ ışık
 scene.add(new THREE.HemisphereLight(0xe6edf5, 0x3a342c, 1.15));
-// Gölge kutusu A + B holü (x -106…120, z ±36) birlikte kapsasın diye ışık hedefi ortaya alındı
+// Gölge kutusu A + B + C holü (x -106…160, z ±36) birlikte kapsasın diye ışık hedefi ortaya alındı
+// (yön aynı kaldı: konum − hedef = (28, 52, 22); js/cevre.js ışık huzmeleri bu yönü kullanır)
 const gunes = new THREE.DirectionalLight(0xfff2df, 2.4);
-gunes.position.set(42, 52, 22);
-gunes.target.position.set(14, 0, 0);
+gunes.position.set(55, 52, 22);
+gunes.target.position.set(27, 0, 0);
 scene.add(gunes.target);
 gunes.castShadow = true;
 gunes.shadow.mapSize.set(4096, 4096);
-Object.assign(gunes.shadow.camera, { left: -125, right: 125, top: 50, bottom: -50, near: 5, far: 190 });
+Object.assign(gunes.shadow.camera, { left: -140, right: 140, top: 50, bottom: -50, near: 5, far: 200 });
 gunes.shadow.bias = -0.0003;
 gunes.shadow.normalBias = 0.03;
 gunes.shadow.radius = 2.2;   // yumuşak gölge kenarı (PCF Vogel disk, ~13 cm)
@@ -171,6 +182,10 @@ const HOL_B = {
   rampa: { x0: 50, x1: 114, z0: -64 },               // kapı önü asfalt (kamyonlar burada bekler)
 };
 BINALAR.push({ ad: 'B HOLÜ', x0: HOL_B.x0, x1: HOL_B.x1, z0: HOL_B.z0, z1: HOL_B.z1 });
+// C holü: B'nin doğusunda Ar-Ge & BT holü (sunucu odası, e-bisiklet, İHA, elektrikli araç).
+// B'nin doğu duvarında geçit (koridor ekseninde); A gibi 9 m, güney duvarı içeriden görünür.
+const HOL_C = { x0: HOL_B.x1, x1: 160, z0: -24, z1: 24, H: 9, gecit: [-8, 8], gecitH: 6 };
+BINALAR.push({ ad: 'C HOLÜ', x0: HOL_C.x0, x1: HOL_C.x1, z0: HOL_C.z0, z1: HOL_C.z1 });
 // salonKur'un ortam modülüne (js/cevre.js) verdiği ortak malzemeler (duvara sandviç panel deseni ekler)
 const SALON_MALZEME = {};
 const ON_DUVARLAR = [];   // { g, z }: güney duvarları, kamera içerideyken görünür
@@ -200,9 +215,9 @@ function salonKur() {
     g.add(m);
   };
   // ana koridor A holünden geçitten B holüne kesintisiz uzanır
-  serit(SALON.x0 + 2, -2.2, HOL_B.x1 - 2, -2.2); serit(SALON.x0 + 2, 2.2, HOL_B.x1 - 2, 2.2);
+  serit(SALON.x0 + 2, -2.2, HOL_C.x1 - 2, -2.2); serit(SALON.x0 + 2, 2.2, HOL_C.x1 - 2, 2.2);
   // Yaya geçidi çizgileri koridorda
-  for (let x = SALON.x0 + 16; x <= HOL_B.x1 - 6; x += 20) for (let k = -1.6; k <= 1.6; k += 0.8) serit(x - 1.2, k, x + 1.2, k, 0.35, 0xdedede);
+  for (let x = SALON.x0 + 16; x <= HOL_C.x1 - 6; x += 20) for (let k = -1.6; k <= 1.6; k += 0.8) serit(x - 1.2, k, x + 1.2, k, 0.35, 0xdedede);
 
   // Duvarlar + pencere bandı. Ön (güney) taraf açık: genel bakış oradan. ic: pencere bandının
   // yüzü (duvar normali yönü, +1/−1), pencere=false → iç (hol arası) duvar, pencere yok.
@@ -263,13 +278,48 @@ function salonKur() {
   let xBas = B.x0;
   for (const k of kx) { duvarX(xBas, k - kw, B.z0, B.H); xBas = k + kw; }
   duvarX(xBas, B.x1, B.z0, B.H);
-  // --- doğu duvarı (pencere bandı içeride: −X)
-  duvarZ(B.z0, B.z1, B.x1, B.H, { ic: -1 });
+  // --- doğu duvarı (pencere bandı içeride: −X). Ortası C holüyle paylaşılır: pencere yok + geniş geçit
+  const C = HOL_C;
+  duvarZ(B.z0, C.z0, B.x1, B.H, { ic: -1 });
+  duvarZ(C.z0, C.gecit[0], B.x1, B.H, { pencereli: false });
+  duvarZ(C.gecit[1], C.z1, B.x1, B.H, { pencereli: false });
+  duvarZ(C.z1, B.z1, B.x1, B.H, { ic: -1 });
+  const cL = C.gecit[1] - C.gecit[0];
+  box(0.25, B.H - C.gecitH, cL, duvarMat, B.x1, (B.H + C.gecitH) / 2, (C.gecit[0] + C.gecit[1]) / 2, g);   // lento
+  for (const z of C.gecit) box(0.32, C.gecitH, 0.3, ikazMat, B.x1, C.gecitH / 2, z, g);
+  const gecitBC = lib.levha(['C HOLÜ →', 'Ar-Ge & BT · sunucu odası'], 8, 1.5, { bg: '#17324f', font: 92, px: 1200 });
+  gecitBC.rotation.y = -Math.PI / 2;
+  gecitBC.position.set(B.x1 - 0.2, C.gecitH + 1.2, 0);
+  g.add(gecitBC);
+  const gecitCB = lib.levha(['← B HOLÜ', 'Ağır makine & saha sistemleri'], 8, 1.5, { bg: '#17324f', font: 92, px: 1200 });
+  gecitCB.rotation.y = Math.PI / 2;
+  gecitCB.position.set(B.x1 + 0.2, C.gecitH + 1.2, 0);
+  g.add(gecitCB);
+
+  // --- C holü: zemin (A ile aynı beton, UV ölçekli → tek çizim), kuzey + doğu duvarı, kolonlar, tabela
+  {
+    const cW = C.x1 - C.x0, cD = C.z1 - C.z0;
+    const geo = new THREE.PlaneGeometry(cW, cD);
+    const uv = geo.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (cW / SALON.x), uv.getY(i) * (cD / SALON.z));
+    const zc = new THREE.Mesh(geo, zemin.material);
+    zc.rotation.x = -Math.PI / 2;
+    zc.position.set((C.x0 + C.x1) / 2, 0, (C.z0 + C.z1) / 2);
+    zc.receiveShadow = true;
+    g.add(zc);
+    duvarX(C.x0, C.x1, C.z0, C.H);
+    duvarZ(C.z0, C.z1, C.x1, C.H, { ic: -1 });
+    for (let cx = C.x0 + 5; cx <= C.x1 - 4; cx += 10) box(0.5, C.H, 0.5, M.mavi, cx, C.H / 2, C.z0 + 0.38, g);
+    for (let cz = C.z0 + 12; cz <= C.z1 - 6; cz += 12) box(0.5, C.H, 0.5, M.mavi, C.x1 - 0.38, C.H / 2, cz, g);
+    const tabC = lib.levha(['C HOLÜ', 'Ar-Ge & BT · sunucu odası · kişisel projeler'], 9.2, 1.6, { bg: '#17324f', font: 92, px: 1400 });
+    tabC.position.set((C.x0 + C.x1) / 2, C.H - 3.6, C.z0 + 0.15);   // pencere bandının (H−1.6 ± 0.7) altında
+    g.add(tabC);
+  }
 
   // --- ön (güney) duvarlar: göz hizasında holün güneyi kara boşluk gibi görünmesin.
   // Genel bakış güneyden baktığı için yalnızca kamera duvarın iç tarafındayken (ya da VR'da)
   // görünürler (onDuvarGuncelle). Gölge atmazlar: içeriyi karartmasınlar.
-  for (const [x0, x1, z, h] of [[SALON.x0, SALON.x1, SALON.z / 2, H], [B.x0, B.x1, B.z1, B.H]]) {
+  for (const [x0, x1, z, h] of [[SALON.x0, SALON.x1, SALON.z / 2, H], [B.x0, B.x1, B.z1, B.H], [C.x0, C.x1, C.z1, C.H]]) {
     const og = new THREE.Group();
     const L = x1 - x0, xc = (x0 + x1) / 2;
     const d = box(L, h, 0.25, duvarMat, xc, h / 2, z, og);
@@ -310,7 +360,10 @@ function salonKur() {
     if (kx.some((k) => Math.abs(cx - k) < kw + 1)) continue;
     box(0.5, B.H, 0.5, M.mavi, cx, B.H / 2, B.z0 + 0.38, g);
   }
-  for (let cz = B.z0 + 12; cz <= B.z1 - 6; cz += 12) box(0.5, B.H, 0.5, M.mavi, B.x1 - 0.38, B.H / 2, cz, g);
+  for (let cz = B.z0 + 12; cz <= B.z1 - 6; cz += 12) {
+    if (cz > C.gecit[0] - 1 && cz < C.gecit[1] + 1) continue;   // C geçidi
+    box(0.5, B.H, 0.5, M.mavi, B.x1 - 0.38, B.H / 2, cz, g);
+  }
 
   // --- içeride kamyon şeritleri (beyaz kesikli kenar çizgileri, kapıdan makineye)
   const SERIT_SON = { [kx[0]]: -9, [kx[1]]: -8 };
@@ -782,6 +835,7 @@ function yuru(dt) {
 // ------------------------------------------------------------------ üst şerit düğmeleri
 $('btn-genel').onclick = () => { if (!vr?.aktif()) sec(null); };
 $('btn-saha').onclick = () => { sec(null); const S = sahaGorunum(); uc(S.poz, S.hedef); };
+$('btn-c').onclick = () => { sec(null); const S = cGorunum(); uc(S.poz, S.hedef); };
 $('chk-etiket').onchange = (e) => makineler.forEach((x) => (x.etiket.visible = e.target.checked));
 $('chk-golge').onchange = (e) => { gunes.castShadow = e.target.checked; };
 
@@ -1043,6 +1097,7 @@ try {
     lib, scene, camera, makineler, duvarMat: SALON_MALZEME.duvar,
     A: { x0: SALON.x0, x1: SALON.x1, z0: -SALON.z / 2, z1: SALON.z / 2, H: 9 },
     B: HOL_B,
+    C: HOL_C,
   });
 } catch (e) { console.error('[cevre] kurulamadı', e); }
 // VR: masaüstü seçimini sessizce eşitle (kamera uçuşu / HTML panel yok)

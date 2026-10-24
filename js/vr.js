@@ -7,7 +7,7 @@
 //    sağ panelin aynısı: kontroller, canlı değerler, trend). Paneldeki düğmelere tetikle
 //    basılır; "basılı tut" düğmeleri tetik bırakılana dek etkin kalır.
 //  - Menü: herhangi bir kumandada YAN TUŞ (grip) → makine listesi; seçilen makinenin
-//    önüne ışınlanır. Menüde salon ortası / B holü / VR'dan çıkış da var.
+//    önüne ışınlanır. Menüde salon ortası / B holü / C holü / VR'dan çıkış da var.
 //  - Performans (Quest): gölge kapalı, sis yakın, uzaktaki makineler çizilmez
 //    (sisin arkasında kalır), ekran dokuları yalnız yakındaki makinelerde güncellenir.
 //    Hedef kare hızının altına düşülürse görüş mesafesi kendiliğinden kısalır.
@@ -18,7 +18,7 @@
 import * as THREE from 'three';
 
 const Y = new THREE.Vector3(0, 1, 0);
-const SINIR = { x0: -104, x1: 118, z0: -34, z1: 34 };      // ışınlanma/yürüme alanı (A + B holü, x −106…120)
+const SINIR = { x0: -104, x1: 158, z0: -34, z1: 34 };      // ışınlanma/yürüme alanı (A + B + C holü, x −106…160)
 
 export function vrKur({ renderer, scene, camera, controls, makineler, gunes, etiketler, masaustuSec, gorunumAyarla, buton }) {
   const rig = new THREE.Group();
@@ -222,16 +222,19 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
     x.lineWidth = 3; x.strokeStyle = '#2b3540'; x.stroke();
     x.fillStyle = '#f2c200'; x.font = '700 34px "Space Grotesk", sans-serif'; x.textAlign = 'left'; x.textBaseline = 'alphabetic';
     x.fillText('SANAL FABRİKA · makineye git', 34, 58);
-    const kol = 2, bw = (W - 68 - 14) / kol, bh = 52;
+    // makine sayısı artınca satırlar sığsın diye düğme yüksekliği uyarlanır (alt sıra + kenar payı)
+    const kol = 2, bw = (W - 68 - 14) / kol, satir = Math.ceil(makineler.length / kol);
+    const bh = Math.min(52, Math.floor((H - 84 - 10 - 58 - 26) / satir) - 8);
     makineler.forEach((mk, i) => {
       const c = i % kol, r = Math.floor(i / kol);
       dugme(p, x, 34 + c * (bw + 14), 84 + r * (bh + 8), bw, bh, `${String(mk.no).padStart(2, '0')}  ${mk.m.ad}`, '', () => { menuKapat(); makineyeGit(mk); }, mk === secili);
     });
     const y = 84 + Math.ceil(makineler.length / kol) * (bh + 8) + 10;
-    const ucw = (W - 68 - 28) / 3;
+    const ucw = (W - 68 - 42) / 4;
     dugme(p, x, 34, y, ucw, 58, 'Salon ortası', '', () => { menuKapat(); isinlan(new THREE.Vector3(-30, 0, 0), new THREE.Vector3(-30, 0, -10)); });
     dugme(p, x, 34 + ucw + 14, y, ucw, 58, 'B Holü', '', () => { menuKapat(); isinlan(new THREE.Vector3(62, 0, 1), new THREE.Vector3(82, 0, -8)); });
-    dugme(p, x, 34 + 2 * (ucw + 14), y, ucw, 58, "VR'dan çık", 'dur', () => renderer.xr.getSession()?.end());
+    dugme(p, x, 34 + 2 * (ucw + 14), y, ucw, 58, 'C Holü', '', () => { menuKapat(); isinlan(new THREE.Vector3(126, 0, 1), new THREE.Vector3(150, 0, 0)); });
+    dugme(p, x, 34 + 3 * (ucw + 14), y, ucw, 58, "VR'dan çık", 'dur', () => renderer.xr.getSession()?.end());
     p.tex.needsUpdate = true;
   }
 

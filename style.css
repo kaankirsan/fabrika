@@ -163,6 +163,12 @@ body.arayuzsuz #ust, body.arayuzsuz #liste, body.arayuzsuz #panel, body.arayuzsu
   #panel-ac { top: auto; right: 8px; bottom: calc(10px + env(safe-area-inset-bottom)); max-width: 62vw; }
   body:has(#panel-ac:not([hidden])) #ipucu { bottom: calc(56px + env(safe-area-inset-bottom)); }
 }
+/* çok dar telefon: üst şerit tek satırda kalsın */
+@media (max-width: 480px) {
+  .dugme .uzun { display: none; }
+  #ust { gap: 6px; }
+  .dugme { padding: 6px 8px; }
+}
 /* yatay telefon: panel altta kalırsa sahneye yer kalmaz, sağa al */
 @media (max-width: 900px) and (orientation: landscape) {
   #panel { top: calc(var(--ust-h, 46px) + 52px); bottom: 8px; left: auto; width: 46vw; height: auto; }

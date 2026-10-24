@@ -553,7 +553,11 @@ export function create(lib) {
     if (!is) return;   // hedef zaten masa (iş bitince dönüş rotası verilir)
     const Y = IS_YER[is.tip];
     if (is.faz === 0) {
-      if (!is.r) { opRota(Y.rota, Y.yon, 'on'); is.r = true; }
+      if (!is.r) {
+        // burun tarafındaysa (servis kapağından geliyorsa) önce burnun önündeki köşeye: aracın içinden geçmesin
+        const burunda = opS.x > CX + 1.4 && is.tip === 'kapi';
+        opRota(burunda ? [[CX + 1.82, CZ + 1.2], ...Y.rota] : Y.rota, Y.yon, 'on'); is.r = true;
+      }
       if (opVardi()) is.faz = 1;
     } else if (is.faz === 1) {
       opS.poz = 'yukari';

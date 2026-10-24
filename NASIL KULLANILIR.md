@@ -50,3 +50,5 @@ kare hızı düşerse görüş mesafesi kendiliğinden kısalır.
 - `tools/vr-sertifika/` yerel test sertifikasıdır; siteyi internete yayınlarken bu klasörü koymayın
   (GitHub Pages zaten HTTPS verir, sertifikaya gerek kalmaz).
 - `?sabit=0` adres parametresi parça birleştirmeyi kapatır (karşılaştırma/hata ayıklama için).
+- `?onderle=0` açılıştaki gölgelendirici ön derlemesini kapatır (karşılaştırma için; normalde açık kalsın).
+- Link paylaşılınca önizlemede `og.jpg` görünür (WhatsApp, LinkedIn, e-posta).

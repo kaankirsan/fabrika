@@ -256,14 +256,20 @@ export function detayEkle(m, profil = 'boya') {
 export function zeminMalzemesi({ tekrar = [1, 1], renk = '#8e9295', puruz = 0.52, derz = true } = {}) {
   const map = canvasTex(1024, 1024, (x, w, h) => {
     x.fillStyle = renk; x.fillRect(0, 0, w, h);
-    // yumuşak çok ölçekli lekeler (açık/koyu), mala izi yayları
+    // yumuşak çok ölçekli lekeler (açık/koyu): alçak frekanslı → yarım çözünürlükte ayrı katmana çizilip
+    // büyütülür (görüntü aynı, çizim ≈4× hızlı); mala izi yayları ve tane tam çözünürlükte
+    const k = 0.5, lc = document.createElement('canvas');
+    lc.width = w * k; lc.height = h * k;
+    const l = lc.getContext('2d');
     for (let i = 0; i < 260; i++) {
-      const r = 20 + Math.random() ** 2 * 260, cx = Math.random() * w, cy = Math.random() * h;
+      const r = (20 + Math.random() ** 2 * 260) * k, cx = Math.random() * w * k, cy = Math.random() * h * k;
       const koyu = Math.random() < 0.55, a = 0.018 + Math.random() * 0.035;
-      const gr = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+      const gr = l.createRadialGradient(cx, cy, 0, cx, cy, r);
       gr.addColorStop(0, koyu ? `rgba(40,42,44,${a})` : `rgba(235,236,232,${a})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
-      x.fillStyle = gr; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill();
+      l.fillStyle = gr; l.beginPath(); l.arc(cx, cy, r, 0, Math.PI * 2); l.fill();
     }
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(lc, 0, 0, w, h);
     x.lineWidth = 1.2;
     for (let i = 0; i < 70; i++) {
       x.strokeStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '30,30,30'},${0.02 + Math.random() * 0.03})`;

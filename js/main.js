@@ -57,6 +57,11 @@ const YERLESIM = [
   { id: 'iha',       x: 141,   z: 11,  ry: Math.PI },
   { id: 'earac',     x: 154,   z: 11,  ry: Math.PI },
 ];
+// Modül indirmeleri hemen başlasın: salon kurulurken ağ boşta kalmaz. Aynı belirteçle yapılan sonraki
+// import() aynı modül kaydını döndürür (ikinci indirme yok); hata olursa orada yakalanır.
+for (const y of YERLESIM) import(`./machines/${y.id}.js`).catch(() => {});
+import('./scada.js').catch(() => {});
+import('./cevre.js').catch(() => {});
 
 // ------------------------------------------------------------------ renderer
 const canvas = $('sahne');
@@ -1111,6 +1116,11 @@ vr = vrKur({
 const ilk = URLP.get('m');
 const ilkX = ilk && makineler.find((x) => x.m.id === ilk || x.yer.id === ilk);
 sec(ilkX || null, { anlik: true }); // null → ekran yönüne uygun genel bakış
+// Gölgelendiriciler ilk kareden önce, yükleme ekranı açıkken derlenir (gizli nesneler dahil: compile tüm
+// sahneyi gezer). KHR_parallel_shader_compile varsa derleme arka planda ve paralel → ilk kare donmaz.
+if (URLP.get('onderle') !== '0') {   // ?onderle=0: karşılaştırma / hata ayıklama
+  try { await renderer.compileAsync(scene, camera); } catch (e) { console.warn('ön derleme atlandı', e); }
+}
 lodHazirla();   // sabitle + SCADA + çevre kurulduktan sonra: birleşmiş parçalar listeye girmez
 renderer.setAnimationLoop(dongu);
 $('yukleniyor').classList.add('bitti');

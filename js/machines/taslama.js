@@ -468,7 +468,7 @@ export function create(lib) {
     x.fillStyle = yan ? '#ff3b1f' : '#d9d9d9'; x.beginPath(); x.arc(sx + 59, 104, 20, Math.PI, 0); x.fill();
     x.fillRect(sx + 35, 104, 48, 10);
     etiket('HATA LAMBASI', sx + 59, 124);
-    kutu(sx, 160, 118, 40, '#1b1b1b', '#000'); lib.dokaLogo(x, sx + 59, 180, 30, '#fff');
+    kutu(sx, 160, 118, 40, '#1b1b1b', '#000'); lib.dokaLogo(x, sx + 59, 180, 30, { zemin: null });
     // 3. sıra: sayaçlar
     const sayac = (i, etk, deger, yesil) => {
       const cx = X0 + i * DX + KW / 2 + (i === 2 ? 6 : 0), y0 = 252;

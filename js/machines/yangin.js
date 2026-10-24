@@ -496,7 +496,7 @@ export function create(lib) {
   function presHmi(x, W, H) {
     x.fillStyle = '#cfd9e4'; x.fillRect(0, 0, W, H);
     x.fillStyle = '#111'; x.fillRect(10, 10, 120, 40);
-    lib.dokaLogo(x, 70, 30, 30, '#fff');
+    lib.dokaLogo(x, 70, 30, 30, { zemin: null });
     x.textBaseline = 'middle';
     const ok = durum === 'calisiyor';
     x.fillStyle = ok ? '#30b94a' : durum === 'durdu' ? '#8a96a3' : '#e0402a';

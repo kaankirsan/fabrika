@@ -489,20 +489,27 @@ export function canvasTex(w, h, ciz, { tekrar = null, srgb = true } = {}) {
 }
 
 // ------------------------------------------------------------------ doka logosu
-// Firmanın resmi logosu (img/doka-logo.png, Kaan'ın verdiği görselden): beyaz + saydam maske —
-// solda yuvarlak köşeli kutu (içinde boşluk olarak "⊃<" işareti), sağda "doka". "DOKA" yazan
-// her yerde metin yerine bu çizilir. dokaLogo() maskeyi istenen renge boyar: koyu zeminde
-// beyaz, açık zeminde siyah (işaret zemin renginde kalır). main.js makineleri kurmadan önce
-// dokaLogoHazir'ı bekler; görsel yüklenemezse aynı ölçülerde basit vektör çizilir.
+// Firmanın resmi logosu (img/doka-logo.png, Kaan'ın verdiği görselden). Logonun TEK doğru hali
+// görseldeki gibidir: siyah zemin, beyaz yuvarlak köşeli kutu, kutunun içinde siyah "⊃<"
+// işareti, sağda beyaz "doka". Renkler ters çevrilmez (açık zeminde bile siyah rozet çizilir).
+// "DOKA" yazan her yerde metin yerine bu çizilir. Görsel beyaz + saydam maskedir; işaret
+// saydamdır, altındaki siyah zemin görünür. main.js makineleri kurmadan önce dokaLogoHazir'ı
+// bekler; görsel yüklenemezse aynı ölçülerde basit vektör çizilir.
 const _logo = new Image();
 export const dokaLogoHazir = new Promise((r) => { _logo.onload = r; _logo.onerror = r; });
 _logo.src = new URL('../img/doka-logo.png', import.meta.url).href;
 const LOGO_ORAN = 1662 / 516, LOGO_ISARET = 0.4589;   // genişlik/yükseklik, kutunun genişlik payı
+const LOGO_PAY = 10 / 172;                             // siyah rozetin kenar boşluğu (logo yüksekliğine oranla)
 const _logoBoya = new Map();
-// x: 2D bağlam, (cx, cy) merkez, h yükseklik (px), renk; isaret: true → yalnız kutu (⊃<).
-// Dönüş: çizilen genişlik.
-export function dokaLogo(x, cx, cy, h, renk = '#fff', { isaret = false } = {}) {
-  const pay = isaret ? LOGO_ISARET : 1, w = h * LOGO_ORAN * pay;
+// x: 2D bağlam, (cx, cy) logo merkezi, h logo yüksekliği (px).
+//   zemin: siyah rozet rengi; null → rozet çizilmez (çağıran zaten siyah/koyu zemin çizdiyse).
+//   tekRenk: yalnız tek renkli baskı/kabartma için (ör. klişe): beyaz kısımlar bu renkte, işaret boş.
+//   isaret: true → yalnız kutu (⊃<).
+// Dönüş: logonun genişliği (rozet boşlukları hariç).
+export function dokaLogo(x, cx, cy, h, { zemin = '#000', tekRenk = null, isaret = false } = {}) {
+  const pay = isaret ? LOGO_ISARET : 1, w = h * LOGO_ORAN * pay, p = h * LOGO_PAY;
+  const renk = tekRenk || '#ffffff';
+  if (zemin && !tekRenk) { x.save(); x.fillStyle = zemin; x.fillRect(cx - w / 2 - p, cy - h / 2 - p, w + 2 * p, h + 2 * p); x.restore(); }
   if (_logo.naturalWidth) {
     let c = _logoBoya.get(renk);
     if (!c) {
@@ -517,23 +524,21 @@ export function dokaLogo(x, cx, cy, h, renk = '#fff', { isaret = false } = {}) {
     x.drawImage(c, 0, 0, c.width * pay, c.height, cx - w / 2, cy - h / 2, w, h);
     return w;
   }
-  // yedek: kutu + işaret boşluğu + yazı (birim = h / 172, kaynak görselin pikseli)
+  // yedek: beyaz kutu, içinde zemin renginde işaret, beyaz yazı (birim = h / 172, kaynak görselin pikseli)
   const u = h / 172, x0 = cx - w / 2, y0 = cy - h / 2;
   x.save();
   x.fillStyle = renk;
   x.beginPath(); x.roundRect(x0 + 1.4 * u, y0 + 1.3 * u, 251.4 * u, 169 * u, 3.5 * u); x.fill();
-  x.globalCompositeOperation = 'destination-out';
-  x.lineWidth = 15 * u; x.lineCap = 'butt';
+  x.strokeStyle = zemin || '#000'; x.lineWidth = 15 * u; x.lineCap = 'butt';
   x.beginPath(); x.moveTo(x0 + 44 * u, y0 + 60 * u); x.lineTo(x0 + 85 * u, y0 + 60 * u);
   x.arc(x0 + 85 * u, y0 + 92.5 * u, 32.5 * u, -Math.PI / 2, Math.PI / 2); x.lineTo(x0 + 44 * u, y0 + 125 * u); x.stroke();
   x.beginPath(); x.moveTo(x0 + 204 * u, y0 + 56 * u); x.lineTo(x0 + 143 * u, y0 + 92.5 * u); x.lineTo(x0 + 204 * u, y0 + 129 * u); x.stroke();
-  x.restore();
   if (!isaret) {
-    x.save(); x.fillStyle = renk; x.textAlign = 'left'; x.textBaseline = 'middle';
+    x.textAlign = 'left'; x.textBaseline = 'middle';
     x.font = `500 ${Math.round(100 * u)}px "Space Grotesk", sans-serif`;
     x.fillText('doka', x0 + 325 * u, cy + 2 * u);
-    x.restore();
   }
+  x.restore();
   return w;
 }
 
@@ -833,10 +838,9 @@ export function iz(n = 600, renk = 0x39c5cf, parent = null) {
 let _logoTex = null;
 function operatorLogo() {
   if (_logoTex) return _logoTex;
-  _logoTex = canvasTex(512, 360, (x) => {         // beyaz yama üstünde siyah doka logosu
-    x.fillStyle = '#ffffff'; x.fillRect(0, 0, 512, 360);
-    x.strokeStyle = '#141414'; x.lineWidth = 8; x.strokeRect(8, 8, 496, 344);
-    dokaLogo(x, 256, 180, 134, '#141414');
+  _logoTex = canvasTex(512, 180, (x) => {         // sırt yaması: siyah zeminde resmi doka logosu
+    x.fillStyle = '#000'; x.fillRect(0, 0, 512, 180);
+    dokaLogo(x, 256, 90, 140);
   });
   return _logoTex;
 }
@@ -862,7 +866,7 @@ export function operator({ yelek = 0xffd400, gomlek = 0x1a3a78, baret = 0xffd400
     add(og('band', () => new THREE.BoxGeometry(0.52, 0.05, 0.32)), refMat, 0, 1.2, 0);
     add(og('band', () => new THREE.BoxGeometry(0.52, 0.05, 0.32)), refMat, 0, 0.92, 0);
     if (logo) {
-      const lp = add(og('logo', () => new THREE.PlaneGeometry(0.34, 0.24)),
+      const lp = add(og('logo', () => new THREE.PlaneGeometry(0.34, 0.12)),
         mat(0xffffff, { r: 0.7, key: 'op-logo', ek: { map: operatorLogo(), emissive: 0xffffff, emissiveMap: operatorLogo(), emissiveIntensity: 0.25 } }), 0, 1.1, -0.161);
       lp.rotation.y = Math.PI; lp.castShadow = false;
     }

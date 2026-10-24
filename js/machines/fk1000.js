@@ -244,10 +244,10 @@ export function create(lib) {
     for (const xh of [0.25, -0.07]) kutu(0.04, 0.085, 0.04, kMat, xh, TOP + 0.04, zh);
     if (ek) kutu(0.3, 0.02, 0.03, inoxMat, 0.09, TOP + 0.012, 0.63);        // yan paslanmaz lama
   }
-  // ayrı doka logo levhası (tabla üstünde; beyaz levhada siyah resmi logo)
+  // ayrı doka logo levhası (tabla üstünde; siyah levhada resmi logo)
   const dkLogoTex = lib.canvasTex(512, 192, (x, w, h) => {
-    x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
-    lib.dokaLogo(x, w / 2, h / 2, 146, '#111');
+    x.fillStyle = '#000'; x.fillRect(0, 0, w, h);
+    lib.dokaLogo(x, w / 2, h / 2, 146);
   });
   const levhaMat = new THREE.MeshStandardMaterial({ map: dkLogoTex, roughness: 0.5 });
   const logoLevha = new THREE.Mesh(new THREE.PlaneGeometry(0.25, 0.09), levhaMat);
@@ -260,9 +260,8 @@ export function create(lib) {
     x.strokeStyle = '#8c9096'; x.lineWidth = 6; x.strokeRect(3, 3, w - 6, h - 6);
     // doku: sol = kumanda ucu (-Z), üst = siyah ön yüz (-X); butonların sarı etiketleri arka-solda
     x.fillStyle = '#e9c21a'; x.fillRect(16, 150, 14, 40); x.fillRect(16, 222, 14, 40);
-    // doka logo bloğu (sağ-orta, beyaz zeminde dikey resmi logo) + QR (sağ-ön)
-    x.fillStyle = '#fff'; x.fillRect(222, 106, 48, 128);
-    x.save(); x.translate(246, 170); x.rotate(-Math.PI / 2); lib.dokaLogo(x, 0, 0, 34, '#111'); x.restore();
+    // doka logo bloğu (sağ-orta, dikey resmi logo; kendi siyah rozetiyle) + QR (sağ-ön)
+    x.save(); x.translate(246, 170); x.rotate(-Math.PI / 2); lib.dokaLogo(x, 0, 0, 34); x.restore();
     for (let i = 0; i < 9; i++) for (let j = 0; j < 9; j++) if ((i * 7 + j * 13 + i * j) % 3 === 0) { x.fillStyle = '#111'; x.fillRect(262 + j * 7, 22 + i * 7, 7, 7); }
   });
   const kontMats = [deckMat, deckMat, new THREE.MeshStandardMaterial({ map: kontTex, roughness: 0.5, metalness: 0.2 }), deckMat, deckMat, deckMat];
@@ -332,15 +331,14 @@ export function create(lib) {
   const band2 = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.05, 0.32), refMat);
   band2.position.y = 0.92; operator.add(band2);
   // Logo patch on back — high-contrast, larger, slightly offset to clear vest
-  const lc = document.createElement('canvas'); lc.width = 512; lc.height = 360;
+  const lc = document.createElement('canvas'); lc.width = 512; lc.height = 180;
   const lctx = lc.getContext('2d');
-  lctx.fillStyle = '#ffffff'; lctx.fillRect(0,0,512,360);
-  lctx.strokeStyle = '#141414'; lctx.lineWidth = 8; lctx.strokeRect(8,8,496,344);
-  lib.dokaLogo(lctx, 256, 180, 134, '#141414');                // resmi doka logosu
+  lctx.fillStyle = '#000'; lctx.fillRect(0, 0, 512, 180);
+  lib.dokaLogo(lctx, 256, 90, 140);                            // siyah zeminde resmi doka logosu
   const logoTex = new THREE.CanvasTexture(lc);
   logoTex.colorSpace = THREE.SRGBColorSpace;
   const logoMat = new THREE.MeshStandardMaterial({ map: logoTex, roughness: 0.7, emissive: 0xffffff, emissiveMap: logoTex, emissiveIntensity: 0.25 });
-  const logoPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.24), logoMat);
+  const logoPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.12), logoMat);
   logoPanel.position.set(0, 1.10, -0.161); logoPanel.rotation.y = Math.PI; operator.add(logoPanel);
 
   // Head + hard hat (proper construction style)

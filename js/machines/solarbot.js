@@ -182,7 +182,7 @@ export function create(lib) {
   // üst plaka: siyah, beyaz doka logosu (logo önden okunur: soldan sağa −z yönünde)
   const plakaTex = canvasTex(512, 185, (x, w, h) => {
     x.fillStyle = '#18191c'; x.fillRect(0, 0, w, h);
-    lib.dokaLogo(x, w / 2, h / 2, 118, '#ffffff');
+    lib.dokaLogo(x, w / 2, h / 2, 118, { zemin: null });   // plaka zaten siyah
   });
   box(0.13, 0.006, 0.36, siyah, 0.07, RY + 0.203, 0, robot);
   const plakaYuz = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.13), new THREE.MeshStandardMaterial({ map: plakaTex, roughness: 0.5, metalness: 0.1 }));

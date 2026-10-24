@@ -1,8 +1,9 @@
-// js/machines/solarbot.js — SolarBot: otonom güneş paneli temizleme robotu.
+// js/machines/solarbot.js — SolarBot: otonom güneş paneli temizleme robotu (DOKA).
 //
-// Fotoğraf/videodan: alçak profilli (~0.75 × 0.65 m) alüminyum şasi, iki yanda
-// palet, arkada kısa direkte OAK-D derinlik kamerası, üstte kontrol kutusu ve
-// köşelerde sarı tamponlar; bir versiyonda önde fırça/sıyırıcı var.
+// Prototip fotoğraf/videolarından: alçak profilli (~0.7 × 0.7 m) gövde, iki yanda palet,
+// arkada direkte OAK-D derinlik kamerası, önde ve arkada dönen fırça. Kaporta Kaan'ın
+// verdiği referans görsele göre: beyaz gövde + turuncu şeritler, gövdeye bitişik ön/arka
+// fırça kutuları, üstte DOKA plakası.
 // Burada 25° eğimli bir panel masasının üstünde zikzak (boustrophedon) şeritlerle
 // ilerler; fırçanın geçtiği yerde panel üstündeki toz katmanı silinir.
 
@@ -113,91 +114,200 @@ export function create(lib) {
   }
   for (const zl of [-0.85, 0.85]) box(LX, 0.05, 0.05, M.celik, 0, -0.045, zl, yuzey); // kuşaklar
 
-  // Şarj / park platformu (masanın sol üst ucunda; şeritler arası transfer noktası)
-  const Z0 = -1.36, DZ = 0.544, SERIT = 6, XL = 2.55, XD = -3.42;
+  // Şarj / park platformu (masanın sol üst ucunda; şeritler arası transfer noktası).
+  // Şerit aralığı: fırça boyu 0.74 m → ilk ve son şeritte fırça ucu panel kenarına denk gelir.
+  const Z0 = -1.32, DZ = 0.528, SERIT = 6, XL = 2.55, XD = -3.42;
   const plaka = mat(0xb5bcc2, { r: 0.45, m: 0.8, key: 'plaka' });
-  box(0.84, 0.03, 0.74, plaka, -3.43, -0.012, Z0, yuzey);
-  box(0.1, 0.18, 0.5, M.koyu, -3.88, 0.07, Z0, yuzey);                     // şarj kutusu
+  box(1.18, 0.03, 0.86, plaka, -3.59, -0.012, Z0, yuzey);
+  // şarj istasyonu: robot platformda yerinde dönerken süpürdüğü dairenin (r ≈ 0.63 m) dışında
+  box(0.1, 0.2, 0.56, M.koyu, -4.12, 0.08, Z0, yuzey);
   const sarjLed = lamba(0x2ea043, 0.3);
-  box(0.02, 0.04, 0.12, sarjLed, -3.82, 0.12, Z0, yuzey);
-  for (const dz of [-0.12, 0.12]) box(0.06, 0.02, 0.05, mat(0xc07a3a, { r: 0.3, m: 0.9, key: 'bakir' }), -3.8, 0.02, Z0 + dz, yuzey);
+  box(0.02, 0.04, 0.14, sarjLed, -4.06, 0.14, Z0, yuzey);
+  const bakir = mat(0xc07a3a, { r: 0.3, m: 0.9, key: 'bakir' });
+  for (const dz of [-0.12, 0.12]) box(0.3, 0.006, 0.04, bakir, XD, 0.006, Z0 + dz, yuzey);   // zemin şarj kontakları (robotun altında)
   {
-    const p = yuzeyNokta(-3.43, -0.03, Z0);
+    const p = yuzeyNokta(-3.5, -0.03, Z0);
     beam([p[0], 0, p[2]], p, 0.07, 0.07, M.celik, g);
     box(0.25, 0.1, 0.25, M.gri, p[0], 0.05, p[2], g);
     beam(yuzeyNokta(-3.0, -0.03, Z0), yuzeyNokta(-2.7, -0.12, Z0 + 0.3), 0.05, 0.05, M.celik, g);
   }
 
   // ---------------------------------------------------------------- robot
+  // Kaporta Kaan'ın verdiği referansa göre: beyaz gövde + turuncu şeritler, gövdeye bitişik ön ve
+  // arka fırça kutusu (beyaz kapak, gri bant, turuncu etek, altta beyaz kıllar), üstte DOKA plakası,
+  // arkada kamera direği. Robot yerel ekseni: +x ileri, y yukarı, z yan.
   const robot = new THREE.Group();
+  robot.name = 'solarbotRobot';
   yuzey.add(robot);
   const RY = 0.004;
-  const paletDoku = () => {
-    const t = canvasTex(64, 16, (x, w, h) => {
-      x.fillStyle = '#161616'; x.fillRect(0, 0, w, h);
-      x.fillStyle = '#3b3b3b'; for (let i = 0; i < 8; i++) x.fillRect(i * 8, 0, 3, h);
-    }, { tekrar: [10, 1] });
-    return t;
+  const beyaz = mat(0xeeeeea, { r: 0.36, m: 0.05, key: 'sbBeyaz' });
+  const turuncu = mat(0xf0601e, { r: 0.42, m: 0.05, key: 'sbTuruncu' });
+  const griBant = mat(0xa3a9ae, { r: 0.4, m: 0.3, key: 'sbGri' });
+  const kabuk = (geo) => {   // ExtrudeGeometry parçaları (robot.add + gölge)
+    const m = new THREE.Mesh(geo, beyaz);
+    m.castShadow = m.receiveShadow = true;
+    robot.add(m);
+    return m;
   };
+
+  // paletler: gövdenin yan altında, uçları yuvarlak
+  const paletDoku = () => canvasTex(64, 16, (x, w, h) => {
+    x.fillStyle = '#161616'; x.fillRect(0, 0, w, h);
+    x.fillStyle = '#3b3b3b'; for (let i = 0; i < 8; i++) x.fillRect(i * 8, 0, 3, h);
+  }, { tekrar: [6.25, 1] });            // 0.08 m / tekrar (update'teki 12.5 katsayısı)
   const texSol = paletDoku(), texSag = paletDoku();
-  for (const [sz, tex] of [[-0.33, texSol], [0.33, texSag]]) {
-    box(0.8, 0.085, 0.085, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 }), 0, RY + 0.043, sz, robot);
-    for (const sx of [-0.38, 0.38]) cyl(0.045, 0.095, M.koyu, sx, RY + 0.045, sz, robot, { eksen: 'z', seg: 16 });
+  for (const [sz, tex] of [[-0.29, texSol], [0.29, texSag]]) {
+    box(0.5, 0.1, 0.085, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 }), 0, RY + 0.05, sz, robot);
+    for (const sx of [-0.25, 0.25]) cyl(0.05, 0.085, M.kaucuk, sx, RY + 0.05, sz, robot, { eksen: 'z', seg: 18 });
   }
-  // gövde: beyaz alüminyum, üst yüzde kırmızı çıkartma
-  box(0.72, 0.06, 0.56, mat(0xdfe3e6, { r: 0.4, m: 0.5, key: 'sbgovde' }), 0, RY + 0.115, 0, robot);
-  const cikartma = canvasTex(512, 400, (x, w, h) => {
-    x.fillStyle = '#e4e7ea'; x.fillRect(0, 0, w, h);
-    x.save(); x.translate(w * 0.5, h * 0.5); x.rotate(-0.5);
-    x.fillStyle = '#d1302a'; x.font = '800 64px "Space Grotesk", sans-serif'; x.textAlign = 'center';
-    x.fillText('SOLARBOT', 0, 20);
-    x.restore();
-    x.fillStyle = '#d1302a';
-    for (let i = 0; i < 3; i++) { x.beginPath(); x.moveTo(30 + i * 34, 60); x.lineTo(60 + i * 34, 20); x.lineTo(76 + i * 34, 20); x.lineTo(46 + i * 34, 60); x.fill(); }
-    x.fillStyle = '#5b6f8f'; x.font = '500 18px "JetBrains Mono", monospace';
-    for (let i = 0; i < 4; i++) x.fillText('ROS 2 · OAK-D · LiFePO4 24V', 30, 320 + i * 20);
+  box(0.56, 0.03, 0.4, M.koyu, 0, RY + 0.06, 0, robot);               // alt şasi (paletler arası)
+
+  // gövde kabuğu: kalça çatı kesiti (ön/arka eğimli, üstü düz), yanlar büyük pahla yuvarlatılmış.
+  // Pah 0.035 → dış ölçü 0.67 (x) × 0.69 (z), alt 0.05, üst 0.20 m.
+  {
+    const s = new THREE.Shape();
+    s.moveTo(0.3, 0.085); s.lineTo(0.3, 0.1); s.lineTo(0.17, 0.165); s.lineTo(-0.17, 0.165);
+    s.lineTo(-0.3, 0.1); s.lineTo(-0.3, 0.085); s.closePath();
+    const gg = new THREE.ExtrudeGeometry(s, { depth: 0.62, bevelEnabled: true, bevelThickness: 0.035, bevelSize: 0.035, bevelSegments: 5 });
+    gg.translate(0, RY, -0.31);
+    kabuk(gg);
+  }
+  for (const sx of [-1, 1]) box(0.012, 0.02, 0.6, turuncu, sx * 0.338, RY + 0.065, 0, robot);   // gövde alt turuncu şerit
+  // yan tutamaklar
+  for (const sz of [-1, 1]) {
+    rod([-0.1, RY + 0.115, sz * 0.372], [0.1, RY + 0.115, sz * 0.372], 0.008, M.koyu, robot, 10);
+    for (const hx of [-0.1, 0.1]) box(0.022, 0.022, 0.03, M.koyu, hx, RY + 0.115, sz * 0.357, robot);
+  }
+  // üst plaka: turuncu, DOKA (yazı önden okunur: soldan sağa −z yönünde)
+  const plakaTex = canvasTex(512, 282, (x, w, h) => {
+    x.fillStyle = '#f0601e'; x.fillRect(0, 0, w, h);
+    x.fillStyle = '#ffffff'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    if ('letterSpacing' in x) x.letterSpacing = '14px';
+    x.font = '700 138px "Space Grotesk", "Segoe UI", sans-serif';
+    x.fillText('DOKA', w / 2 + 7, h * 0.43);
+    if ('letterSpacing' in x) x.letterSpacing = '6px';
+    x.font = '600 30px "Space Grotesk", "Segoe UI", sans-serif';
+    x.fillText('MÜHENDİSLİK', w / 2 + 3, h * 0.8);
   });
-  const ust = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.54), new THREE.MeshStandardMaterial({ map: cikartma, roughness: 0.5, metalness: 0.2 }));
-  ust.rotation.x = -Math.PI / 2;
-  ust.position.y = RY + 0.146;
-  robot.add(ust);
-  for (const sx of [-0.37, 0.37]) for (const sz of [-0.28, 0.28]) box(0.05, 0.05, 0.05, M.sari, sx, RY + 0.095, sz, robot); // tamponlar
-  // kontrol kutusu + kablo
-  box(0.3, 0.07, 0.2, M.koyu, -0.04, RY + 0.18, 0.02, robot);
-  box(0.26, 0.012, 0.03, M.siyah, -0.04, RY + 0.22, 0.02, robot);
-  const durumLed = lamba(0x2ea043, 1.5);
-  box(0.03, 0.02, 0.03, durumLed, 0.08, RY + 0.22, -0.06, robot);
-  rod([-0.19, RY + 0.18, 0.05], [-0.22, RY + 0.26, 0.0], 0.008, M.siyah, robot);
-  // ön + arka dönen fırça ve kapakları (Kaan: robotun önünde ve arkasında fırça var)
-  const FX = 0.42;
-  const fircaTex = canvasTex(64, 32, (x, w, h) => {
-    x.fillStyle = '#2b2f36'; x.fillRect(0, 0, w, h);
-    x.fillStyle = '#5d6673'; for (let i = 0; i < 8; i++) x.fillRect(i * 8, 0, 3, h);
-  }, { tekrar: [3, 6] });
-  const fircaMat = new THREE.MeshStandardMaterial({ map: fircaTex, roughness: 0.95 });
-  const fircalar = [FX, -FX].map((fx) => {
+  box(0.22, 0.008, 0.4, turuncu, 0.055, RY + 0.204, 0, robot);
+  const plakaYuz = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.22), new THREE.MeshStandardMaterial({ map: plakaTex, roughness: 0.42, metalness: 0.05 }));
+  plakaYuz.rotation.set(-Math.PI / 2, 0, Math.PI / 2);
+  plakaYuz.position.set(0.055, RY + 0.2085, 0);
+  robot.add(plakaYuz);
+  // ön eğimde ürün adı
+  {
+    const yaziTex = canvasTex(512, 96, (x, w, h) => {
+      x.fillStyle = '#f0601e'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      if ('letterSpacing' in x) x.letterSpacing = '8px';
+      x.font = '700 62px "Space Grotesk", "Segoe UI", sans-serif';
+      x.fillText('SOLARBOT', w / 2 + 4, h / 2 + 2);
+    });
+    const egim = Math.atan2(0.0784, 0.157);   // pahlı ön eğim: (0.335, 0.122) → (0.178, 0.20)
+    const eg = new THREE.Group();
+    eg.position.set(0.225 + Math.sin(egim) * 0.0012, RY + 0.177 + Math.cos(egim) * 0.0012, 0);   // eğimin üst %70'i: alçak açıdan fırça kutusu örtmesin
+    eg.rotation.z = -egim;
+    robot.add(eg);
+    const yazi = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.056), new THREE.MeshStandardMaterial({
+      map: yaziTex, transparent: true, roughness: 0.4, polygonOffset: true, polygonOffsetFactor: -2,
+    }));
+    yazi.rotation.set(-Math.PI / 2, 0, Math.PI / 2);
+    eg.add(yazi);
+  }
+
+  // ön + arka fırça kutusu (Kaan: robotun önünde ve arkasında, gövdeye bitişik fırça var).
+  // Kutu kesiti x-y'de çizilip z boyunca uzatılır; fırça mili kutunun altında, kıllar etekten taşar.
+  const FX = 0.415, FB = 0.42, BL = 0.78;   // kutu ekseni, fırça mili ekseni, kutu boyu (m)
+  const kapakSekli = (sg) => {
+    const P = [[-0.075, 0.125], [0.075, 0.125], [0.075, 0.15], [0.048, 0.178], [-0.075, 0.178]];  // dış yüz +x, üst dış köşe pahlı
+    const s = new THREE.Shape();
+    s.moveTo(sg * P[0][0], P[0][1]);
+    for (let i = 1; i < P.length; i++) s.lineTo(sg * P[i][0], P[i][1]);
+    s.closePath();
+    return s;
+  };
+  // kıllar: açık renkli sık kıl göbeği (çizgili doku, dönüşü gösterir) + çevresinde helis dizilmiş
+  // ince tutamlar (boy/eğim hafif rastgele → uçlar düzensiz, tek InstancedMesh / fırça)
+  const NZ = 64, NA = 18;
+  const tutamGeo = new THREE.BoxGeometry(0.0065, 0.032, 0.0075);
+  tutamGeo.translate(0, 0.016, 0);                       // taban mil yüzeyinde, uç dışa
+  const tutamMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, metalness: 0 });
+  const gobekTex = canvasTex(64, 64, (x, w, h) => {
+    x.fillStyle = '#d9d5cc'; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 40; i++) { x.fillStyle = `rgba(120,112,100,${0.12 + Math.random() * 0.2})`; x.fillRect(Math.random() * w, 0, 1 + Math.random() * 2, h); }
+  }, { tekrar: [3, 10] });
+  const gobekMat = new THREE.MeshStandardMaterial({ map: gobekTex, roughness: 0.9, metalness: 0 });
+  const _s = new THREE.Vector3();
+  const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _c = new THREE.Color();
+  const fircalar = [1, -1].map((sg) => {
+    const cx = sg * FX;
+    const kg = new THREE.ExtrudeGeometry(kapakSekli(sg), { depth: BL - 0.008, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2 });
+    kg.translate(cx, RY, -(BL - 0.008) / 2);
+    kabuk(kg);
+    box(0.15, 0.013, BL - 0.01, griBant, cx, RY + 0.1165, 0, robot);     // gri bant
+    box(0.15, 0.05, BL - 0.01, turuncu, cx, RY + 0.085, 0, robot);       // turuncu etek (alt kenar 0.06 → altında ≈6 cm kıl görünür)
+    for (const ez of [-1, 1]) {
+      box(0.158, 0.148, 0.012, beyaz, cx, RY + 0.109, ez * (BL / 2 + 0.004), robot);                   // uç kapağı (mili taşır)
+      cyl(0.016, 0.012, M.alu, sg * FB, RY + 0.058, ez * (BL / 2 + 0.014), robot, { eksen: 'z', seg: 14 }); // mil yatağı
+    }
+    // gövdeye bağlantı: iki alüminyum braket (kutu üstü → gövde eğimi) + turuncu ara şerit
+    for (const bz of [-0.2, 0.2]) beam([sg * 0.395, RY + 0.186, bz], [sg * 0.3, RY + 0.143, bz], 0.008, 0.045, M.alu, robot);
+    for (let i = 0; i < 6; i++) cyl(0.005, 0.016, M.kirmizi, sg * (FX - 0.062), RY + 0.053, -0.3 + i * 0.12, robot, { seg: 8 }); // püskürtme memeleri
+    // dönen fırça
     const f = new THREE.Group();
-    f.position.set(fx, RY + 0.06, 0);
+    f.position.set(sg * FB, RY + 0.058, 0);
     robot.add(f);
-    cyl(0.058, 0.64, fircaMat, 0, 0, 0, f, { eksen: 'z', seg: 18 });
-    box(0.16, 0.025, 0.68, M.koyu, fx, RY + 0.13, 0, robot);
-    for (const sz of [-0.34, 0.34]) box(0.14, 0.09, 0.015, M.koyu, fx, RY + 0.09, sz, robot);
+    cyl(0.05, BL - 0.03, gobekMat, 0, 0, 0, f, { eksen: 'z', seg: 18 });
+    const kil = new THREE.InstancedMesh(tutamGeo, tutamMat, NZ * NA);
+    let i = 0;
+    for (let k = 0; k < NZ; k++) for (let j = 0; j < NA; j++, i++) {
+      const a = ((j + Math.random() * 0.35) / NA) * Math.PI * 2 + k * 0.29;
+      _p.set(Math.cos(a) * 0.034, Math.sin(a) * 0.034, -0.37 + (k + 0.3 + Math.random() * 0.4) * (0.74 / NZ));
+      _q.setFromEuler(_e.set((Math.random() - 0.5) * 0.25, 0, a - Math.PI / 2 + (Math.random() - 0.5) * 0.3));   // +y dışa (radyal)
+      _s.set(1, 0.88 + Math.random() * 0.24, 1);
+      kil.setMatrixAt(i, _m4.compose(_p, _q, _s));
+      kil.setColorAt(i, _c.setHSL(0.11, 0.16, 0.8 + Math.random() * 0.13));
+    }
+    kil.castShadow = true; kil.receiveShadow = true;
+    f.add(kil);
     return f;
   });
-  // OAK-D kamera direği + görüş konisi
-  rod([-0.25, RY + 0.14, 0], [-0.25, RY + 0.44, 0], 0.012, M.alu, robot);
+
+  // su hattı: arka fırça kutusunun ucundaki rakordan direk dibine beyaz hortum
+  {
+    const V = (x, y, z) => new THREE.Vector3(x, RY + y, z);
+    const yol = new THREE.CatmullRomCurve3([
+      V(-0.39, 0.193, -0.37), V(-0.39, 0.193, -0.22), V(-0.36, 0.186, -0.12), V(-0.31, 0.16, -0.07),
+      V(-0.24, 0.18, -0.04), V(-0.17, 0.21, -0.015), V(-0.142, 0.214, -0.004),
+    ]);
+    const h = new THREE.Mesh(new THREE.TubeGeometry(yol, 40, 0.009, 8), mat(0xe9e3d3, { r: 0.5, m: 0, key: 'hortum' }));
+    h.castShadow = h.receiveShadow = true;
+    robot.add(h);
+    cyl(0.013, 0.032, M.alu, -0.39, RY + 0.193, -0.38, robot, { eksen: 'z', seg: 12 });   // rakor
+  }
+
+  // kamera direği (arkada, ortada): flanş, beyaz konik direk, durum LED halkası, OAK-D başlığı
+  const MX = -0.11;
+  cyl(0.032, 0.03, M.alu, MX, RY + 0.215, 0, robot, { seg: 20 });
+  cyl(0.022, 0.32, beyaz, MX, RY + 0.39, 0, robot, { seg: 20, r2: 0.027 });
+  cyl(0.036, 0.07, beyaz, MX, RY + 0.585, 0, robot, { seg: 20, r2: 0.022 });
+  const durumLed = lamba(0x2ea043, 1.5);
+  cyl(0.029, 0.014, durumLed, MX, RY + 0.53, 0, robot, { seg: 20 });
   const kam = new THREE.Group();
-  kam.position.set(-0.24, RY + 0.46, 0);
-  kam.rotation.z = -0.38;
+  kam.position.set(MX, RY + 0.655, 0);
+  kam.rotation.z = -0.42;                  // öne-aşağı bakar
   robot.add(kam);
-  box(0.032, 0.032, 0.11, M.siyah, 0, 0, 0, kam);
-  for (const dz of [-0.035, 0, 0.035]) cyl(0.007, 0.006, mat(0x3a5a8a, { r: 0.1, m: 0.6, key: 'lens' }), 0.017, 0, dz, kam, { eksen: 'x', seg: 10 });
+  box(0.075, 0.06, 0.14, beyaz, 0, 0, 0, kam);
+  box(0.09, 0.012, 0.15, beyaz, 0.006, 0.036, 0, kam);                  // güneşlik
+  box(0.004, 0.032, 0.115, M.siyah, 0.0385, 0, 0, kam);                // OAK-D ön yüzü
+  for (const dz of [-0.04, 0, 0.04]) cyl(0.008, 0.006, mat(0x3a5a8a, { r: 0.1, m: 0.6, key: 'lens' }), 0.041, 0, dz, kam, { eksen: 'x', seg: 12 });
   const koni = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.3, 24, 1, true), new THREE.MeshBasicMaterial({
     color: 0x39c5cf, transparent: true, opacity: 0.08, depthWrite: false, side: THREE.DoubleSide,
   }));
   koni.rotation.z = Math.PI / 2;           // ucu kamerada, açıklığı +X
   koni.position.x = 0.67;
   kam.add(koni);
+  // robotun sabit parçaları malzeme başına birleşir (fırçalar döner, LED/palet malzemeleri tek)
+  lib.sabitle(robot, fircalar);
 
   // ---------------------------------------------------------------- yer istasyonu (tablet + kule lambası)
   const ist = new THREE.Group();
@@ -292,7 +402,8 @@ export function create(lib) {
   let rota = anaRota(), wi = 0, kaldigi = 0;
 
   const sar = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-  const izinli = (x, z) => (Math.abs(x) <= 2.66 && Math.abs(z) <= 1.47) || (x >= -3.8 && x <= -2.6 && Math.abs(z - Z0) <= 0.32);
+  // kenar sensörü: gövde merkezi panel içinde (fırça ucu kenarı ≈ 2 cm aşar), platformda şarj kutusuna değmez
+  const izinli = (x, z) => (Math.abs(x) <= 2.66 && Math.abs(z) <= 1.36) || (x >= -3.46 && x <= -2.6 && Math.abs(z - Z0) <= 0.32);
   const panelde = () => Math.abs(R.x) <= 3.0;
 
   // Noktaya git: önce yerinde dön (paletli), sonra düz sür. Varınca true.
@@ -305,14 +416,14 @@ export function create(lib) {
     return false;
   }
 
-  function fircaSil() { for (const fx of [FX, -FX]) fircaIzi(fx); }
+  function fircaSil() { for (const fx of [FB, -FB]) fircaIzi(fx); }
   function fircaIzi(fx) {
     const bx = R.x + Math.cos(R.h) * fx, bz = R.z - Math.sin(R.h) * fx;
     tozCtx.save();
     tozCtx.globalCompositeOperation = 'destination-out';
     tozCtx.translate((bx + LX / 2) * TS, (bz + LZ / 2) * TS);
     tozCtx.rotate(-R.h);
-    tozCtx.fillRect(-0.09 * TS, -0.33 * TS, 0.18 * TS, 0.66 * TS);
+    tozCtx.fillRect(-0.09 * TS, -0.37 * TS, 0.18 * TS, 0.74 * TS);   // kıllı boy 0.74 m
     tozCtx.restore();
     tozKirli = true;
     // kapsam ızgarası
@@ -323,7 +434,7 @@ export function create(lib) {
       const k = j * GX + i;
       if (temiz[k]) continue;
       const cx = -3 + (i + 0.5) * 0.1 - bx, cz = -1.7 + (j + 0.5) * 0.1 - bz;
-      if (Math.abs(cx * c - cz * s) <= 0.1 && Math.abs(cx * s + cz * c) <= 0.33) { temiz[k] = 1; temizSay++; }
+      if (Math.abs(cx * c - cz * s) <= 0.1 && Math.abs(cx * s + cz * c) <= 0.37) { temiz[k] = 1; temizSay++; }
     }
   }
   const temizYuzde = () => (temizSay / (GX * GZ)) * 100;
@@ -371,7 +482,7 @@ export function create(lib) {
     robot.rotation.y = R.h;
 
     // palet dokuları ve fırça
-    const vL = R.v - R.w * 0.33, vR = R.v + R.w * 0.33;
+    const vL = R.v - R.w * 0.29, vR = R.v + R.w * 0.29;
     texSol.offset.x -= vL * dt * 12.5;
     texSag.offset.x -= vR * dt * 12.5;
     const fircaDon = fircaAcik && durum !== 'acil' && durum !== 'sarj';
@@ -466,27 +577,28 @@ export function create(lib) {
     id: 'solarbot',
     ad: 'SolarBot',
     altBaslik: 'Otonom panel temizleme · ROS 2 · YOLO',
-    kisa: 'Güneş paneli masasında otonom çalışan paletli temizleme robotu: OAK-D derinlik kamerası ile engel/kenar algılama, YOLO ile panel tespiti, zikzak kapsama yolu, Smart BMS\'li LiFePO4 batarya ve otomatik şarja dönüş.',
+    kisa: 'Güneş paneli masasında otonom çalışan paletli temizleme robotu: önünde ve arkasında gövdeye bitişik dönen fırça kutuları, OAK-D derinlik kamerası ile engel/kenar algılama, YOLO ile panel tespiti, zikzak kapsama yolu, Smart BMS\'li LiFePO4 batarya ve otomatik şarja dönüş.',
     proje: 'solarbot',
     ayakIzi: [8.4, 5.8],
     kamera: { poz: [-1.6, 4.4, 6.4], hedef: [0.3, 1.25, -0.3] },
     mekanizmalar: [
       'Paletler: sol/sağ palet ayrı hızda döner (diferansiyel sürüş, yerinde dönüş)',
-      'Ön ve arka fırça: ters yönde döner, ikisi de geçtiği yerdeki toz katmanını siler',
+      'Ön ve arka fırça kutusu: gövdeye braketle bağlı; içindeki kıllı fırçalar ters yönde döner, ikisi de geçtiği yerdeki tozu 0.74 m genişlikte siler',
       'Zikzak kapsama: 6 şerit boyunca git, şerit değiştir, geri dön',
       'Batarya %15 altına inince şarj platformuna döner, dolunca kaldığı şeritten devam eder',
       'OAK-D kamera: direk üstünde, öne-aşağı bakar (görüş konisi)',
       'Operatör: yer istasyonu tabletinin başında izler; manuel modda telsiz kumandayla robota döner, robot şarja dönünce platforma yürüyüp bakar',
     ],
     cikarim: [
-      'solarbot-img-02/04/05 ve video-03: düz, alçak alüminyum şasi; iki yanda dar palet; arkada direkte kamera; köşelerde sarı tamponlar; üstte koyu kontrol kutusu ve kablo → gövde ölçüsü ~0.75 × 0.65 m alındı.',
+      'solarbot-img-02/04/05 ve video-03 (prototip): alçak gövde, iki yanda palet, arkada direkte kamera, yan tutamak, önde beyaz su borusu → ölçüler (~0.7 × 0.7 m gövde, 0.78 m fırça kutusu) ve yerleşim buradan.',
+      'KAAN\'IN DÜZELTMESİ (referans görsel, marka DOKA): fırçalar gövdeye bitişik ön/arka fırça kutularında — beyaz kapak, gri bant, turuncu etek, altında beyaz kıllar; kamera başlığı beyaz konik direğin üstünde; üstte turuncu marka plakası → kaporta bu görsele göre yeniden çizildi (prototipteki açık şasi ve sarı tamponlar yerine).',
       'solarbot-video-02: elde tutulan uzun siyah kamera → OAK-D (3 lensli) olarak direğe kondu.',
       'solarbot-img-07: önünde fırça/sıyırıcı olan paletli versiyon; KAAN\'IN DÜZELTMESİ: robotun önünde VE arkasında dönen fırça var → iki fırça.',
       'solarbot-img-01 (BMS) ve -06 (pano): LiFePO4 8S 24V batarya ve Smart BMS → batarya modeli ve şarja dönüş davranışı.',
       'TAHMİN: panel masası ölçüsü (6 × 2 panel, 25°), şarj/park platformu ve zikzak yol; videolarda robot atölye zemininde test ediliyor, panel üstü görüntüsü yok.',
     ],
     group: g,
-    // sabitle(): robot (paletler, fırçalar, kamera konisi) hareketli; toz/panel tek mesh, operatör kendiliğinden atlanır
+    // sabitle(): robot hareketli (kendi sabit parçaları create içinde birleşti); toz/panel tek mesh, operatör kendiliğinden atlanır
     sabitHaric: [robot],
     update,
     kontroller,

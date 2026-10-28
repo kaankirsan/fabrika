@@ -31,6 +31,16 @@ const URLP = new URLSearchParams(location.search);
 if (URLP.get('ui') === '0') document.body.classList.add('arayuzsuz');
 let mod = URLP.get('mod') === 'kus' || (URLP.get('ui') === '0' && URLP.get('mod') !== 'gez') ? 'kus' : 'gez';
 const DOKUNMATIK = matchMedia('(hover: none) and (pointer: coarse)').matches;
+// Ziyaret sayacı (GoatCounter, index.html): gezmeye başlama, incelenen makineler, kuş bakışı, VR.
+// Her olay sayfa başına bir kez sayılır; sayaç engellenmiş ya da yüklenmemişse sessizce geçilir.
+// Yerel sunucu ve otomasyon tarayıcıları (ekran görüntüsü betikleri) sayılmaz.
+const sayilanlar = new Set();
+function olaySay(ad, baslik) {
+  const g = window.goatcounter;
+  if (!g?.count || sayilanlar.has(ad)) return;
+  sayilanlar.add(ad);
+  try { g.count({ path: 'fabrika/' + ad, title: baslik, event: true }); } catch (e) { /* sayaç yok */ }
+}
 
 // Kuzey sırası (z<0) önünü koridora (+Z) verir; güney sırası 180° döner.
 // Konteyner, FK-1000 ve big bag A holünün doğusundaki B holünde. Konteyner ile big bag
@@ -679,6 +689,7 @@ let panelMakine = null;   // panelde şu an hangi makinenin içeriği var
 function paneliKur(x) {
   panelMakine = x;
   const { m } = x;
+  olaySay('makine/' + m.id, `${String(x.no).padStart(2, '0')} ${m.ad}`);
   const P = $('panel-ic');
   senkronlar = [];
   P.innerHTML = '';
@@ -1085,6 +1096,7 @@ function modGec(yeni, { x, z } = {}) {
   karsilamaKapat();
   mod = yeni;
   if (yeni === 'kus') {
+    olaySay('kus-bakisi', 'Kuş bakışına geçti');
     gezgin.etkin = false;
     controls.enabled = true;
     controls.target.copy(gezgin.ileri(8)).setY(0);
@@ -1109,7 +1121,12 @@ function modGec(yeni, { x, z } = {}) {
   }
   arayuzGuncelle();
 }
-function karsilamaKapat() { const k = $('karsilama'); if (k && !k.hidden) k.hidden = true; }
+// karşılama kartı yalnızca ziyaretçinin ilk hareketiyle kapanır → "gezmeye başladı" (portföy bağlantısıyla
+// gelende kart hiç açılmaz; orada makine olayı sayılır)
+function karsilamaKapat() {
+  const k = $('karsilama');
+  if (k && !k.hidden) { k.hidden = true; olaySay('basla', 'Gezmeye başladı'); }
+}
 $('k-basla').onclick = () => { karsilamaKapat(); gezgin?.kilitle(); };
 $('k-kus').onclick = () => { karsilamaKapat(); modGec('kus'); };
 let yolSon = '';
@@ -1441,7 +1458,11 @@ vr = vrKur({
   // VR'a yürüyüşten girilirse aynı yerde, aynı yöne bakarak başla; çıkınca yürüyüş VR'da kalınan yerden sürer
   baslangic: () => (mod === 'gez' ? gezgin.konum : null),
   bitis: (x, z, yaw) => { if (mod === 'gez') { gezgin.isinla(x, z, yaw, 0); gezgin.etkin = true; } arayuzGuncelle(); },
-  basladi: () => { gezgin.etkin = false; makineler.forEach((m) => m.etiket.scale.set(8.4, 1.4, 1)); },   // VR'da tam boy etiket
+  basladi: () => {
+    olaySay('vr', "VR'a girdi");
+    gezgin.etkin = false;
+    makineler.forEach((m) => m.etiket.scale.set(8.4, 1.4, 1));   // VR'da tam boy etiket
+  },
 });
 const ilk = URLP.get('m');
 const ilkX = ilk && makineler.find((x) => x.m.id === ilk || x.yer.id === ilk);

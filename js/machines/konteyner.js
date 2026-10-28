@@ -345,6 +345,7 @@ export function create(lib) {
 
   // ---------------------------------------------------------------- kamyon (çekici + iskelet konteyner dorsesi)
   const tir = new THREE.Group();
+  tir.userData.gezGecer = true;   // yer değiştirir: ziyaretçi yürüme haritasında engel sayılmaz (js/gezgin.js)
   g.add(tir);
   const tekerlekler = [];
   function aks(x, r, ikiz, parent) {
@@ -748,6 +749,7 @@ export function create(lib) {
     ayakIzi: [16, 37],
     ayakIziMerkez: [0, 15.5],
     kamera: { poz: [15, 10, 27], hedef: [0, 0.8, 9.5] },
+    durus: { poz: [-8.5, 6], bak: [4, 1.5, 6] },     // yürüyüş: koridor tarafından raylara ve kamyon kapısına bakar
     mekanizmalar: [
       'Panel dizisi: 16 yaprak (yaprak başına 4 panel), akordeon menteşe; açılırken üçgenler yapar, dıştaki üçgen önce yatar (~22°), dizi ~30 m',
       'Hidromotor + tahrik mili + zincir dişlileri: raydaki zincir alt menteşe arabalarını (sarı tekerlek) çekerek açar / çekerek toplar',

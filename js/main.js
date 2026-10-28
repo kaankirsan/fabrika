@@ -5,7 +5,12 @@
 // "hazırlanıyor" yer tutucusu görünür (konsola hata düşer).
 //
 // URL parametreleri (test / doğrudan bağlantı için):
-//   ?m=<id>   açılışta o makineye odaklan      ?ui=0   arayüzü gizle
+//   ?m=<id>   açılışta o makineye git (yürüyerek)      ?ui=0   arayüzü gizle
+//   ?mod=gez|kus   birinci şahıs (varsayılan) ya da kuş bakışı ile aç (?ui=0 kuş bakışıyla açılır)
+//
+// İki gezinti modu: 'gez' — göz hizasında yürüyüş (js/gezgin.js: harita, yol bulma, fare kilidi,
+// dokunmatik kumanda), girişte başlar, makine seçilince koridorlardan yürüyerek gider; 'kus' — eski
+// yörünge kamerası (genel bakış, makine yakın planı). Üst şeritteki düğme / M tuşu arasında geçer.
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
@@ -18,11 +23,14 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import * as lib from './lib.js';
 import { vrKur } from './vr.js';
+import { gezginKur } from './gezgin.js';
 
 const { M, box, canvasTex, easeInOut, clamp } = lib;
 const $ = (id) => document.getElementById(id);
 const URLP = new URLSearchParams(location.search);
 if (URLP.get('ui') === '0') document.body.classList.add('arayuzsuz');
+let mod = URLP.get('mod') === 'kus' || (URLP.get('ui') === '0' && URLP.get('mod') !== 'gez') ? 'kus' : 'gez';
+const DOKUNMATIK = matchMedia('(hover: none) and (pointer: coarse)').matches;
 
 // Kuzey sırası (z<0) önünü koridora (+Z) verir; güney sırası 180° döner.
 // Konteyner, FK-1000 ve big bag A holünün doğusundaki B holünde. Konteyner ile big bag
@@ -119,9 +127,28 @@ const cGorunum = () => (dikey() ? C_DIKEY : C_GORUNUM);
 // arasındaki serbest alanın ortasına kaydır: makine panelin arkasında kalmasın.
 // Dar ekranda serbest alan DOM'dan ölçülür (üstte şerit + yatay liste, panel altta ya da sağda).
 let serbest = { fw: 1, fh: 1 };
-function gorunumAyarla() {
+// Görüntü merkezi kayması (px): şimdiki → hedef. anlik=false iken birkaç karede kayar (yürüyüşte
+// makineye varınca panel açılırken görüntü zıplamasın).
+const ofs = { kx: 0, ky: 0, hx: 0, hy: 0 };
+function ofsUygula() {
+  const W = window.innerWidth, H = window.innerHeight;
+  if (Math.abs(ofs.kx) >= 0.5 || Math.abs(ofs.ky) >= 0.5) camera.setViewOffset(W, H, Math.round(ofs.kx), Math.round(ofs.ky), W, H);
+  else camera.clearViewOffset();
+  camera.updateProjectionMatrix();
+}
+function ofsAdim(dt) {
+  if (ofs.kx === ofs.hx && ofs.ky === ofs.hy) return;
+  const a = 1 - Math.exp(-dt * 8);
+  ofs.kx += (ofs.hx - ofs.kx) * a; ofs.ky += (ofs.hy - ofs.ky) * a;
+  if (Math.abs(ofs.hx - ofs.kx) < 0.5 && Math.abs(ofs.hy - ofs.ky) < 0.5) { ofs.kx = ofs.hx; ofs.ky = ofs.hy; }
+  ofsUygula();
+}
+function gorunumAyarla(anlik = true) {
   const W = window.innerWidth, H = window.innerHeight;
   camera.aspect = W / H;
+  // Görüş açısı (dikey): kuş bakışında 45°; yürüyüşte 55° (16:9'da ≈85° yatay, birinci şahıs hissi),
+  // dikey telefonda yatay görüş çok daralmasın diye 75°'ye kadar
+  camera.fov = mod === 'gez' ? (camera.aspect < 1 ? clamp(55 + (1 - camera.aspect) * 36, 55, 75) : 55) : 45;
   let kx = 0, ky = 0;
   if (W > 900) {
     kx = Math.round(((!$('panel').hidden ? 370 : 0) - 250) / 2);
@@ -137,8 +164,9 @@ function gorunumAyarla() {
     ky = Math.round(H / 2 - (T + B) / 2);
     serbest = { fw: Math.max(0.2, (R - L) / W), fh: Math.max(0.2, (B - T) / H) };
   }
-  if (kx || ky) camera.setViewOffset(W, H, kx, ky, W, H); else camera.clearViewOffset();
-  camera.updateProjectionMatrix();
+  ofs.hx = kx; ofs.hy = ky;
+  if (anlik) { ofs.kx = kx; ofs.ky = ky; }
+  ofsUygula();
   renderer.setSize(W, H);
 }
 
@@ -150,7 +178,7 @@ function darCarpani() {
   const k = Math.max(0.385 / (t * serbest.fh), 0.45 / (t * camera.aspect * serbest.fw));
   return THREE.MathUtils.clamp(k, 1, 2.8);
 }
-window.addEventListener('resize', gorunumAyarla);
+window.addEventListener('resize', () => gorunumAyarla());
 
 // ------------------------------------------------------------------ ışık
 scene.add(new THREE.HemisphereLight(0xe6edf5, 0x3a342c, 1.15));
@@ -173,6 +201,10 @@ scene.add(gunes);
 const SALON = { x0: -106, x1: 46, z: 46 };
 SALON.x = SALON.x1 - SALON.x0;
 SALON.xc = (SALON.x0 + SALON.x1) / 2;
+// Ziyaretçi girişi: A holünün batı duvarında, ana koridor ekseninde. Birinci şahıs gezinti burada,
+// kapıya sırtını vermiş, koridor boyunca doğuya bakarak başlar.
+const GIRIS = { z0: -1.7, z1: 1.7, h: 2.9 };
+const BASLANGIC = { x: SALON.x0 + 3.2, z: 0, yaw: -Math.PI / 2, pitch: -0.04 };
 // Binaların zemin dikdörtgenleri (SCADA ana ekranındaki yerleşim haritası vb. bunu okur;
 // yeni hol eklenince buraya da eklenir).
 const BINALAR = [{ ad: 'A HOLÜ', x0: SALON.x0, x1: SALON.x1, z0: -SALON.z / 2, z1: SALON.z / 2 }];
@@ -246,9 +278,38 @@ function salonKur() {
   const ikazMat = new THREE.MeshStandardMaterial({ map: lib.ikazDokusu([1, 12]), roughness: 0.6 });
   const B = HOL_B;
 
-  // --- A holü: arka + batı duvarı
+  // --- A holü: arka + batı duvarı; batı duvarında ziyaretçi girişi (alüminyum kasalı çift kanat
+  // buzlu cam kapı, lento, içeride paspas ve karşılama tabelası; camın ardında gün ışığı)
   duvarX(SALON.x0, SALON.x1, -SALON.z / 2, H);
-  duvarZ(-SALON.z / 2, SALON.z / 2, SALON.x0, H);
+  duvarZ(-SALON.z / 2, GIRIS.z0, SALON.x0, H);
+  duvarZ(GIRIS.z1, SALON.z / 2, SALON.x0, H);
+  {
+    const gw = GIRIS.z1 - GIRIS.z0, x = SALON.x0;
+    box(0.25, H - GIRIS.h, gw, duvarMat, x, (H + GIRIS.h) / 2, 0, g);                       // lento
+    const pb = box(0.05, 1.4, gw + 2, pencere, x + 0.16, H - 1.6, 0, g);                   // pencere bandı kesintisiz
+    pb.castShadow = false;
+    const kasa = lib.mat(0x3b4148, { r: 0.4, m: 0.7, key: 'kapiKasa' });
+    for (const z of [GIRIS.z0 + 0.06, GIRIS.z1 - 0.06, 0]) box(0.16, GIRIS.h, z ? 0.12 : 0.07, kasa, x + 0.02, GIRIS.h / 2, z, g);
+    box(0.16, 0.14, gw, kasa, x + 0.02, GIRIS.h - 0.07, 0, g);
+    const camK = new THREE.MeshStandardMaterial({ color: 0xc9d7e1, roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.55 });
+    for (const s of [-1, 1]) {
+      const kz = (s * gw) / 4;
+      const k = box(0.03, GIRIS.h - 0.2, gw / 2 - 0.1, camK, x + 0.03, (GIRIS.h - 0.14) / 2, kz, g);
+      k.castShadow = false;
+      box(0.06, 0.08, gw / 2 - 0.1, kasa, x + 0.03, 0.04, kz, g);                                    // alt kayıt
+      lib.rod([x + 0.13, 1.05, kz - s * 0.18], [x + 0.13, 1.05, kz - s * 0.66], 0.017, M.paslanmaz, g, 10);   // itme kolu
+      for (const u of [0.18, 0.66]) box(0.09, 0.03, 0.03, M.paslanmaz, x + 0.08, 1.05, kz - s * u, g);
+    }
+    const gun = new THREE.Mesh(new THREE.PlaneGeometry(gw + 0.4, GIRIS.h + 0.3), new THREE.MeshBasicMaterial({ color: 0xd6e2ea }));
+    gun.rotation.y = Math.PI / 2;
+    gun.position.set(x - 0.7, GIRIS.h / 2, 0);
+    g.add(gun);
+    box(1.8, 0.012, gw - 0.2, lib.mat(0x2a2d31, { r: 0.95, m: 0, key: 'paspas' }), x + 1.1, 0.006, 0, g);   // paspas
+    const tab = lib.levha(['GİRİŞ · HOŞ GELDİNİZ', 'Sanal Fabrika · Kaan Kırşan'], 5.2, 1.0, { bg: '#17324f', font: 92, px: 1300 });
+    tab.rotation.y = Math.PI / 2;
+    tab.position.set(x + 0.2, GIRIS.h + 1.05, 0);
+    g.add(tab);
+  }
 
   // --- B holü zemini: A ile aynı beton malzemesi (UV, A'nın dokuya işlenmiş tekrarına göre ölçeklenir → tek çizim)
   const bW = B.x1 - B.x0, bD = B.z1 - B.z0;
@@ -533,9 +594,58 @@ function makineKamerasi(x) {
 
 // ------------------------------------------------------------------ seçim / arayüz
 let secili = null;
-function sec(x, { anlik = false } = {}) {
+let gezgin = null;   // birinci şahıs gezinti (js/gezgin.js), sahne kurulunca
+const kartlariIsaretle = () => document.querySelectorAll('.kart').forEach((k, i) => k.classList.toggle('secili', makineler[i] === secili));
+
+// Makinenin önünde ayakta duruş noktası (yürüyüş ve VR ortak). Makine `durus` verdiyse o (yerel
+// [x, z] + bakış [x, y, z]); yoksa masaüstü yakın plan açısından (kamera.poz → hedef) türetilir. Girişten
+// ulaşılabilen en yakın yürünebilir noktaya oturtulur; bakış makinenin hedefine.
+function durusNoktasi(x) {
+  let k, px, pz;
+  if (x.m.durus) {
+    x.kok.updateMatrixWorld(true);
+    const p = x.kok.localToWorld(new THREE.Vector3(x.m.durus.poz[0], 0, x.m.durus.poz[1]));
+    k = { hedef: x.kok.localToWorld(new THREE.Vector3().fromArray(x.m.durus.bak)) };
+    px = p.x; pz = p.z;
+  } else {
+    k = makineKamerasi(x);
+    const yon = k.poz.clone().sub(k.hedef); yon.y = 0;
+    const L = clamp(yon.length() * 0.75, 3.0, 6.5);
+    if (yon.lengthSq() < 1e-6) yon.set(0, 0, 1);
+    yon.normalize();
+    px = k.hedef.x + yon.x * L; pz = k.hedef.z + yon.z * L;
+  }
+  const s = gezgin?.enYakin(px, pz, 12) || { x: px, z: pz };
+  const dx = k.hedef.x - s.x, dz = k.hedef.z - s.z;
+  return {
+    x: s.x, z: s.z, hedef: k.hedef,
+    yaw: Math.atan2(-dx, -dz),
+    pitch: clamp(Math.atan2(k.hedef.y - (gezgin?.GOZ ?? 1.65), Math.max(Math.hypot(dx, dz), 0.5)), -0.75, 0.45),
+  };
+}
+// Yürüyüş modunda seçim: makineye koridorlardan yürür, varınca panel açılır (fare kilidi bırakılır:
+// panel imleçle kullanılır). null → panel kapanır, olduğun yerde kalırsın.
+function gezSec(x, { anlik = false } = {}) {
   secili = x;
-  document.querySelectorAll('.kart').forEach((k, i) => k.classList.toggle('secili', makineler[i] === x));
+  kartlariIsaretle();
+  $('panel').hidden = true; $('panel-ac').hidden = true;
+  gorunumAyarla(false);
+  if (!x) { gezgin.iptal(); return; }
+  const d = durusNoktasi(x);
+  const ac = () => {
+    if (secili !== x || mod !== 'gez') return;
+    paneliKur(x);
+    gorunumAyarla(anlik);
+    gezgin.kilitAc();
+  };
+  if (anlik) { gezgin.isinla(d.x, d.z, d.yaw, d.pitch); controls.target.copy(gezgin.ileri(4)); ac(); }
+  else gezgin.git(d, { ad: `${String(x.no).padStart(2, '0')} ${x.m.ad}`, bitince: ac });
+}
+function sec(x, { anlik = false } = {}) {
+  karsilamaKapat();
+  if (mod === 'gez' && gezgin && !vr?.aktif()) { gezSec(x, { anlik }); return; }
+  secili = x;
+  kartlariIsaretle();
   if (!x) {
     $('panel').hidden = true; $('panel-ac').hidden = true; gorunumAyarla();
     const G = genelGorunum();
@@ -565,7 +675,9 @@ function listeKur() {
 }
 
 let senkronlar = [];
+let panelMakine = null;   // panelde şu an hangi makinenin içeriği var
 function paneliKur(x) {
+  panelMakine = x;
   const { m } = x;
   const P = $('panel-ic');
   senkronlar = [];
@@ -585,8 +697,8 @@ function paneliKur(x) {
   gizle.setAttribute('aria-label', 'Paneli gizle');
   gizle.onclick = () => paneliGoster(false);
   const kapat = el('button', 'kapat', '×', dugmeler);
-  kapat.title = 'Genel bakışa dön (Esc)';
-  kapat.setAttribute('aria-label', 'Genel bakışa dön');
+  kapat.title = mod === 'gez' ? 'Paneli kapat, burada kal (Esc)' : 'Genel bakışa dön (Esc)';
+  kapat.setAttribute('aria-label', mod === 'gez' ? 'Paneli kapat' : 'Genel bakışa dön');
   kapat.onclick = () => sec(null);
   el('div', 'p-kisa', m.kisa || '');
   const durumEl = el('span', 'durum', '');
@@ -637,6 +749,7 @@ let panelGuncelle = () => {};
 let panelGizli = false;
 function paneliGoster(acik) {
   if (!secili) return;
+  if (acik && panelMakine !== secili) paneliKur(secili);   // yürüyüş sürerken açılırsa: gidilen makine
   panelGizli = !acik;
   $('panel').hidden = !acik;
   $('panel-ac').hidden = acik;
@@ -755,60 +868,175 @@ const fmtEksen = (v) => (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ?
 // ------------------------------------------------------------------ fare: seçim + hover
 const ray = new THREE.Raycaster();
 const fareN = new THREE.Vector2();
+const _zemin = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), _zp = new THREE.Vector3();
 let basNokta = null;
-function makineBul(e) {
+// ekran noktası (px) → ışın
+function isinKur(cx, cy) {
   const r = canvas.getBoundingClientRect();
-  fareN.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  fareN.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
   ray.setFromCamera(fareN, camera);
-  const hit = ray.intersectObjects(makineler.map((x) => x.kok), true)[0];
+}
+// nişangâh: kameranın baktığı yön ekranda (görüntü merkezi kaymasıyla birlikte) buraya düşer
+const nisanXY = () => [window.innerWidth / 2 - ofs.kx, window.innerHeight / 2 - ofs.ky];
+function makineIsabet(liste = makineler) {
+  const hit = ray.intersectObjects(liste.map((x) => x.kok), true)[0];
   if (!hit) return null;
   let o = hit.object;
   while (o && !o.userData.makine) o = o.parent;
   return o ? makineler.find((x) => x.kok === o) : null;
 }
+function makineBul(e) { isinKur(e.clientX, e.clientY); return makineIsabet(); }
+// ışının zemindeki (y = 0) noktası; bina dışındaysa null
+function zeminNoktasi() {
+  if (!ray.ray.intersectPlane(_zemin, _zp)) return null;
+  return BINALAR.some((b) => _zp.x > b.x0 && _zp.x < b.x1 && _zp.z > b.z0 && _zp.z < b.z1) ? _zp.clone() : null;
+}
+// Kuş bakışı: makineye tık → yakın plan; zemine tık → oraya in, yürüyüşe geç.
+// (Yürüyüşteki tıklamalar gezgin.js'ten gezTik'e gelir.)
 canvas.addEventListener('pointerdown', (e) => { basNokta = { x: e.clientX, y: e.clientY }; });
 canvas.addEventListener('pointerup', (e) => {
+  if (mod !== 'kus' || vr?.aktif()) return;
   if (!basNokta || Math.hypot(e.clientX - basNokta.x, e.clientY - basNokta.y) > 5 || e.button !== 0) return;
   const x = makineBul(e);
-  if (x && x !== secili) sec(x);
+  if (x) { if (x !== secili) sec(x); return; }
+  const p = zeminNoktasi();
+  if (p) modGec('gez', { x: p.x, z: p.z });
 });
+function gezTik({ x, y, merkez, dok }) {
+  karsilamaKapat();
+  if (merkez) isinKur(...nisanXY()); else isinKur(x, y);
+  const mk = makineIsabet();
+  if (mk) {
+    if (mk === secili && !gezgin.yolda) { if ($('panel').hidden) paneliGoster(true); gezgin.kilitAc(); return; }
+    sec(mk);
+    return;
+  }
+  if (merkez) return;
+  if (dok) { const p = zeminNoktasi(); if (p) gezgin.git({ x: p.x, z: p.z }); return; }
+  gezgin.kilitle();                    // masaüstü, imleç serbest: boş yere tık → fareyle bakmaya dön
+}
 let hoverZ = 0;
 canvas.addEventListener('pointermove', (e) => {
   const now = performance.now();
   if (now - hoverZ < 60 || e.buttons) return;
   hoverZ = now;
-  const x = makineBul(e);
   const tt = $('tooltip');
+  if (gezgin?.kilitli) { tt.hidden = true; return; }
+  const x = makineBul(e);
   if (x) {
     tt.hidden = false; tt.textContent = `${String(x.no).padStart(2, '0')} · ${x.m.ad}`;
     tt.style.left = e.clientX + 14 + 'px'; tt.style.top = e.clientY + 12 + 'px';
     canvas.style.cursor = 'pointer';
   } else { tt.hidden = true; canvas.style.cursor = ''; }
 });
+// Fare kilitliyken nişangâhın üstündeki makine (yakındakiler arasında, ~8 Hz)
+let nisanT = 0, nisanMk = null, nisanPx = '';
+function nisanGuncelle(dt) {
+  const [nx, ny] = nisanXY();
+  const px = `${Math.round(nx)},${Math.round(ny)}`;
+  if (px !== nisanPx) { nisanPx = px; $('nisan').style.left = Math.round(nx) + 'px'; $('nisan').style.top = Math.round(ny) + 'px'; }
+  let mk = null;
+  if (gezgin.kilitli) {
+    if ((nisanT += dt) < 0.12) return;
+    nisanT = 0;
+    isinKur(nx, ny);
+    mk = makineIsabet(makineler.filter((x) => x.kure.center.distanceTo(camera.position) - x.kure.radius < 40));
+  }
+  if (mk !== nisanMk) {
+    nisanMk = mk;
+    $('nisan').classList.toggle('makine', !!mk);
+    $('nisan-ad').hidden = !mk;
+    if (mk) $('nisan-ad').textContent = `${String(mk.no).padStart(2, '0')} · ${mk.m.ad} — tıkla, git`;
+  }
+}
 
-// ------------------------------------------------------------------ klavye: WASD yürüyüş, 1-9, Esc
+// ------------------------------------------------------------------ klavye
+// Yürüyüş: WASD / oklar (gezgin.js okur), Shift koş, Boşluk otomatik yürüyüşü atla, M kuş bakışı,
+// 1-9 / Q E makine, P panel, Esc (fare kilitliyken tarayıcı imleci serbest bırakır; değilse
+// yürüyüşü keser / paneli kapatır; kuş bakışında genel bakışa döner).
 const tus = new Set();
+let kilitAcT = 0;
+const YURUME_TUSU = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   const k = e.key.toLowerCase();
-  if (k === 'escape') sec(null);
+  if (k === 'escape') escBas();
   else if (k === 'p' && secili) paneliGoster($('panel').hidden);
+  else if (k === 'm') { if (!e.repeat) modGec(mod === 'gez' ? 'kus' : 'gez'); }
+  else if (k === ' ') { if (gezgin?.yolda) { e.preventDefault(); gezgin.atla(); } }
   else if (/^[1-9]$/.test(k) && makineler[+k - 1]) sec(makineler[+k - 1]);
   else if (k === 'e' || k === 'q') {
     // listede sonraki / önceki makine (9'dan fazla makine için)
     const n = makineler.length, i = secili ? makineler.indexOf(secili) : (k === 'e' ? -1 : 0);
     sec(makineler[(i + (k === 'e' ? 1 : -1) + n) % n]);
-  } else tus.add(k);
+  } else {
+    tus.add(k);
+    if (YURUME_TUSU.has(k)) { karsilamaKapat(); if (k.startsWith('arrow')) e.preventDefault(); }
+  }
   tusIsigi(k, true);
 });
 window.addEventListener('keyup', (e) => { const k = e.key.toLowerCase(); tus.delete(k); tusIsigi(k, false); });
 // pencere odağı kaçarsa (Alt+Tab) keyup gelmez: yürüyüş takılı kalmasın
 window.addEventListener('blur', () => { tus.clear(); document.querySelectorAll('#ipucu kbd.basik').forEach((el) => el.classList.remove('basik')); });
+function escBas() {
+  if (gezgin?.kilitli) { gezgin.kilitAc(); return; }  // tarayıcı Esc'i kendisi işlemediyse
+  if (performance.now() - kilitAcT < 500) return;   // aynı Esc fare kilidini açtı: başka iş yapmasın
+  if (mod === 'gez') {
+    if (gezgin?.yolda) gezgin.iptal();
+    else if (secili) sec(null);
+    else karsilamaKapat();
+  } else sec(null);
+}
 
 // ------------------------------------------------------------------ kontrol kartı (alt ipucu)
-// Basılan tuş kartta yanar; × ile küçülür, tercih bu tarayıcıda hatırlanır.
+// İçerik o anki moda / fare kilidine / cihaza göre yazılır. Basılan tuş kartta yanar; × ile küçülür,
+// tercih bu tarayıcıda hatırlanır.
 function tusIsigi(k, acik) {
   document.querySelectorAll(`#ipucu kbd[data-t="${CSS.escape(k)}"]`).forEach((el) => el.classList.toggle('basik', acik));
+}
+const IKON = {
+  fare: '<svg class="ip-ikon" viewBox="0 0 20 28" aria-hidden="true"><path d="M10 1.5A8.5 8.5 0 0 0 1.5 10v.5H10z" fill="#f2c200"/><rect x="1.5" y="1.5" width="17" height="25" rx="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M1.5 10.5h17M10 1.5v9" stroke="currentColor" stroke-width="1.6"/></svg>',
+  tik: '<svg class="ip-ikon" viewBox="0 0 24 28" aria-hidden="true"><path d="M7 6l13 8.5-5.6 1.3 3.3 6.4-2.6 1.3-3.3-6.4L7 21z" fill="currentColor"/><path d="M3.5 6.5a5 5 0 0 1 5-5M1 9a8 8 0 0 1 4-6.6" fill="none" stroke="#f2c200" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  surukle: '<svg class="ip-ikon" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="15" r="4.5" fill="#f2c200"/><path d="M5 11a10 10 0 0 1 18 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M23 11l.6-4.2M23 11l-4-1.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  iki: '<svg class="ip-ikon" viewBox="0 0 28 28" aria-hidden="true"><circle cx="9.5" cy="18.5" r="4" fill="#f2c200"/><circle cx="18.5" cy="9.5" r="4" fill="#f2c200"/><path d="M5 23l-3 3M23 5l3-3M2 26h4M2 26v-4M26 2h-4M26 2v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  dokun: '<svg class="ip-ikon" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="4.5" fill="#f2c200"/><circle cx="14" cy="14" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".8"/><circle cx="14" cy="14" r="12.5" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".4"/></svg>',
+  kumanda: '<svg class="ip-ikon" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".75"/><circle cx="17.5" cy="10.5" r="5.5" fill="#f2c200"/></svg>',
+};
+const kbd = (t, k = t.toLowerCase()) => `<kbd data-t="${k}">${t}</kbd>`;
+const WASD = `<div class="wasd">${kbd('W')}${kbd('A')}${kbd('S')}${kbd('D')}</div>`;
+const tekTus = (t, k) => `<div class="tuslar">${kbd(t, k)}</div>`;
+const grup = (ikon, b, s) => `<div class="ip-grup">${ikon}<div class="ip-yazi"><b>${b}</b><span>${s}</span></div></div>`;
+function ipucuIcerik() {
+  if (DOKUNMATIK) {
+    if (mod === 'gez') {
+      return grup(IKON.kumanda, 'Sol altta başparmak', 'yürü · sonuna kadar it: koş')
+        + grup(IKON.surukle, 'Sürükle', 'etrafa bak')
+        + grup(IKON.dokun, 'Makineye dokun', 'oraya yürür, panel açılır · zemine dokun: oraya yürü');
+    }
+    return grup(IKON.surukle, 'Tek parmak', 'döndür') + grup(IKON.iki, 'İki parmak', 'yakınlaş · kaydır')
+      + grup(IKON.dokun, 'Makineye dokun', 'yakın plan · zemine dokun: oraya in');
+  }
+  if (mod === 'gez' && gezgin?.kilitli) {
+    return grup(IKON.fare, 'Fare: etrafa bak', 'tık: nişandaki makineye git')
+      + grup(WASD, 'Yürü', `${kbd('Shift')} ile koş`)
+      + grup(tekTus('Esc', 'escape'), 'İmleci göster', 'liste ve paneli kullanmak için')
+      + grup(tekTus('M'), 'Kuş bakışı', `${kbd('Q')}${kbd('E')} önceki / sonraki makine`);
+  }
+  if (mod === 'gez') {
+    return grup(IKON.fare, 'Sürükle: etrafa bak', 'teker: ileri / geri adım')
+      + grup(WASD, 'Yürü', `${kbd('Shift')} ile koş`)
+      + grup(IKON.tik, 'Makineye tıkla: oraya yürü', 'boş yere tıkla: fareyle bak (Esc ile çık)')
+      + grup(tekTus('M'), 'Kuş bakışı', `${kbd('Q')}${kbd('E')} makine · ${kbd('Esc', 'escape')} paneli kapat`);
+  }
+  return grup(IKON.fare, 'Sürükle: döndür', 'sağ tık kaydır · teker yakınlaş')
+    + grup(WASD, 'Kaydır', `${kbd('Shift')} ile hızlı`)
+    + grup(IKON.tik, 'Makineye tıkla: yakın plan', 'zemine tıkla: oraya in, yürü')
+    + grup(tekTus('M'), 'Yürüyüşe dön', `${kbd('Q')}${kbd('E')} makine · ${kbd('Esc', 'escape')} genel bakış`);
+}
+let ipucuSon = '';
+function ipucuGuncelle() {
+  const h = ipucuIcerik();
+  if (h !== ipucuSon) { $('ipucu-ic').innerHTML = h; ipucuSon = h; }
 }
 function ipucuGoster(acik, kaydet = true) {
   $('ipucu').hidden = !acik;
@@ -820,6 +1048,7 @@ $('ipucu-ac').onclick = () => ipucuGoster(true);
 let ipucuKapali = false;
 try { ipucuKapali = localStorage.getItem('fabrika-ipucu') === 'kapali'; } catch {}
 ipucuGoster(!ipucuKapali, false);
+// Kuş bakışında WASD: kamerayla hedefi zemin düzleminde kaydırır (yürüyüşte gezgin.js yürütür)
 const _ileri = new THREE.Vector3(), _sag = new THREE.Vector3();
 function yuru(dt) {
   if (!tus.size) return;
@@ -837,10 +1066,79 @@ function yuru(dt) {
   camera.position.add(v); controls.target.add(v);
 }
 
+// ------------------------------------------------------------------ mod geçişi, karşılama, yolculuk göstergesi
+function arayuzGuncelle() {
+  document.body.dataset.mod = mod;
+  gorunumAyarla(false);
+  const ol = mod === 'gez' ? 0.55 : 1;
+  makineler.forEach((x) => x.etiket.scale.set(8.4 * ol, 1.4 * ol, 1));
+  document.body.classList.toggle('kilitli', !!gezgin?.kilitli);
+  const b = $('btn-mod');
+  b.innerHTML = mod === 'gez' ? 'Kuş bakışı' : 'Yürü<span class="uzun">yüşe geç</span>';
+  b.title = mod === 'gez' ? 'Fabrikaya yukarıdan bak (M)' : 'Göz hizasına in, yürüyerek gez (M)';
+  ipucuGuncelle();
+}
+// yeni: 'gez' | 'kus'. Yürüyüşe geçerken iniş noktası: verilen nokta, seçili makinenin önü ya da
+// kuş bakışının baktığı yer. Kuş bakışına geçerken: seçili makinenin yakın planı ya da genel bakış.
+function modGec(yeni, { x, z } = {}) {
+  if (!gezgin || vr?.aktif() || yeni === mod) return;
+  karsilamaKapat();
+  mod = yeni;
+  if (yeni === 'kus') {
+    gezgin.etkin = false;
+    controls.enabled = true;
+    controls.target.copy(gezgin.ileri(8)).setY(0);
+    controls.update();
+    if (secili) {
+      paneliKur(secili); gorunumAyarla();
+      const k = makineKamerasi(secili); uc(k.poz, k.hedef);
+    } else { const G = genelGorunum(); uc(G.poz, G.hedef); }
+  } else {
+    ucus = null;
+    controls.enabled = false;
+    gezgin.etkin = true;
+    if (x == null && secili) {
+      const d = durusNoktasi(secili);
+      gezgin.inis(d.x, d.z, d.yaw, d.pitch);
+      paneliKur(secili); gorunumAyarla();
+    } else {
+      const t = x != null ? { x, z } : { x: controls.target.x, z: controls.target.z };
+      const dx = t.x - camera.position.x, dz = t.z - camera.position.z;
+      gezgin.inis(t.x, t.z, Math.hypot(dx, dz) > 0.5 ? Math.atan2(-dx, -dz) : BASLANGIC.yaw);
+    }
+  }
+  arayuzGuncelle();
+}
+function karsilamaKapat() { const k = $('karsilama'); if (k && !k.hidden) k.hidden = true; }
+$('k-basla').onclick = () => { karsilamaKapat(); gezgin?.kilitle(); };
+$('k-kus').onclick = () => { karsilamaKapat(); modGec('kus'); };
+let yolSon = '';
+function yolculukGoster(info) {
+  const el = $('yolculuk');
+  if (!info || !info.ad) { if (!el.hidden) el.hidden = true; yolSon = ''; return; }
+  const yazi = `→ ${info.ad} · ${Math.ceil(info.kalan)} m`;
+  if (yazi !== yolSon) { $('yolculuk-yazi').textContent = yazi; yolSon = yazi; }
+  if (el.hidden) el.hidden = false;
+}
+$('yolculuk-atla').onclick = () => gezgin?.atla();
+function karart() {
+  const k = $('karartma');
+  k.classList.add('acik');
+  setTimeout(() => k.classList.remove('acik'), 170);
+}
+
 // ------------------------------------------------------------------ üst şerit düğmeleri
-$('btn-genel').onclick = () => { if (!vr?.aktif()) sec(null); };
-$('btn-saha').onclick = () => { sec(null); const S = sahaGorunum(); uc(S.poz, S.hedef); };
-$('btn-c').onclick = () => { sec(null); const S = cGorunum(); uc(S.poz, S.hedef); };
+$('btn-mod').onclick = () => { if (!vr?.aktif()) modGec(mod === 'gez' ? 'kus' : 'gez'); };
+// B / C holü: yürüyüşte geçitten içeri yürür, kuş bakışında holün üstüne uçar
+function holeGit(h, kusGorunum) {
+  if (vr?.aktif()) return;
+  if (mod === 'gez' && gezgin) {
+    sec(null);
+    gezgin.git({ x: h.x0 + 6, z: 0, yaw: -Math.PI / 2, pitch: -0.04 }, { ad: h.ad });
+  } else { sec(null); const S = kusGorunum(); uc(S.poz, S.hedef); }
+}
+$('btn-saha').onclick = () => holeGit({ x0: HOL_B.x0, ad: 'B Holü' }, sahaGorunum);
+$('btn-c').onclick = () => holeGit({ x0: HOL_C.x0, ad: 'C Holü' }, cGorunum);
 $('chk-etiket').onchange = (e) => makineler.forEach((x) => (x.etiket.visible = e.target.checked));
 $('chk-golge').onchange = (e) => { gunes.castShadow = e.target.checked; };
 
@@ -1024,19 +1322,33 @@ function lodGuncelle(vrde) {
 
 function dongu(zaman) {
   saat.update(zaman);
-  const dt = Math.min(saat.getDelta(), 0.05);
+  const dtHam = saat.getDelta();
+  const dt = Math.min(dtHam, 0.05);   // makine simülasyonu adımı
   t += dt;
   const vrde = vr?.aktif();
   camera.getWorldPosition(_cw);
   for (const x of makineler) {
     try { x.m.update(dt, t); } catch (e) { console.error(`[makine:${x.m.id}] update`, e); x.m.update = () => {}; }
-    // Seçili makinenin etiketi gizli; kameraya yakın olanlar silikleşir (görüşü kapatmasın)
+    // Seçili makinenin etiketi gizli; kameraya yakın olanlar silikleşir (görüşü kapatmasın). Yürüyüşte
+    // etiketler küçük, yakında (≈7 m) ve uzakta (>45 m) söner: göz hizasında kalabalık yapmasın.
     const d = _cw.distanceTo(x.etiket.position);
-    x.etiket.material.opacity = x === secili ? 0 : clamp((d - (vrde ? 5 : 16)) / (vrde ? 4 : 10), 0, 1);
+    x.etiket.material.opacity = x === secili ? 0
+      : vrde ? clamp((d - 5) / 4, 0, 1)
+      : mod === 'gez' ? clamp((d - 7) / 5, 0, 1) * clamp((48 - d) / 12, 0, 1)
+      : clamp((d - 16) / 10, 0, 1);
   }
   if (vrde) {
     vr.update(dt, t);
+  } else if (mod === 'gez' && gezgin) {
+    gezgin.update(Math.min(dtHam, 0.1));   // yürüme hızı düşük kare hızında da aynı kalsın
+    controls.target.copy(gezgin.ileri(4));   // AO mesafe ölçütü ve kuş bakışına geçiş için
+    nisanGuncelle(dt);
+    ofsAdim(dt);
+    gorusT += dt;
+    if (gorusT > 0.25) { gorusT = 0; ekranlariAyarla(); }
+    cozunurlukAyarla(dt);
   } else {
+    ofsAdim(dt);
     if (ucus) {
       ucus.k = Math.min(1, ucus.k + dt / ucus.sure);
       const e = easeInOut(ucus.k);
@@ -1105,17 +1417,49 @@ try {
     C: HOL_C,
   });
 } catch (e) { console.error('[cevre] kurulamadı', e); }
-// VR: masaüstü seçimini sessizce eşitle (kamera uçuşu / HTML panel yok)
+// Birinci şahıs gezinti: yürünebilir alan haritası bütün sahne (makine, SCADA, çevre) kurulduktan sonra
+gezgin = gezginKur({
+  THREE, scene, camera, canvas, tus,
+  sinirlar: BINALAR.map((b) => ({ x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1 })),
+  olay: {
+    tik: gezTik,
+    kilit: (k) => { if (!k) kilitAcT = performance.now(); karsilamaKapat(); arayuzGuncelle(); },
+    yolculuk: yolculukGoster,
+    karart,
+    dokunus: karsilamaKapat,
+  },
+});
+const haritaIst = gezgin.haritaKur(BASLANGIC);
+// VR: masaüstü seçimini sessizce eşitle (kamera uçuşu / HTML panel yok); yürüme/ışınlanma aynı haritayla
 vr = vrKur({
   renderer, scene, camera, controls, makineler, gunes,
   etiketler: makineler.map((x) => x.etiket),
   gorunumAyarla,
   buton: $('btn-vr'),
-  masaustuSec: (x) => { secili = x; document.querySelectorAll('.kart').forEach((k, i) => k.classList.toggle('secili', makineler[i] === x)); },
+  masaustuSec: (x) => { secili = x; kartlariIsaretle(); },
+  gezgin, durusNoktasi,
+  // VR'a yürüyüşten girilirse aynı yerde, aynı yöne bakarak başla; çıkınca yürüyüş VR'da kalınan yerden sürer
+  baslangic: () => (mod === 'gez' ? gezgin.konum : null),
+  bitis: (x, z, yaw) => { if (mod === 'gez') { gezgin.isinla(x, z, yaw, 0); gezgin.etkin = true; } arayuzGuncelle(); },
+  basladi: () => { gezgin.etkin = false; makineler.forEach((m) => m.etiket.scale.set(8.4, 1.4, 1)); },   // VR'da tam boy etiket
 });
 const ilk = URLP.get('m');
 const ilkX = ilk && makineler.find((x) => x.m.id === ilk || x.yer.id === ilk);
-sec(ilkX || null, { anlik: true }); // null → ekran yönüne uygun genel bakış
+if (mod === 'gez') {
+  controls.enabled = false;
+  gezgin.etkin = true;
+  if (ilkX) {
+    // portföydeki "Sanal fabrikada gez" bağlantısı: makinenin ~14 m gerisinde, koridorda başla, yürüyerek git
+    const d = durusNoktasi(ilkX);
+    const s = gezgin.enYakin(clamp(d.x - 14, SALON.x0 + 3, HOL_C.x1 - 3), 0, 8) || BASLANGIC;
+    gezgin.isinla(s.x, s.z, Math.atan2(-(d.x - s.x), -(d.z - s.z)), -0.04);
+    gezSec(ilkX);
+  } else {
+    gezgin.isinla(BASLANGIC.x, BASLANGIC.z, BASLANGIC.yaw, BASLANGIC.pitch);
+    if (!document.body.classList.contains('arayuzsuz')) $('karsilama').hidden = false;
+  }
+} else sec(ilkX || null, { anlik: true }); // null → ekran yönüne uygun genel bakış
+arayuzGuncelle();
 // Gölgelendiriciler ilk kareden önce, yükleme ekranı açıkken derlenir (gizli nesneler dahil: compile tüm
 // sahneyi gezer). KHR_parallel_shader_compile varsa derleme arka planda ve paralel → ilk kare donmaz.
 if (URLP.get('onderle') !== '0') {   // ?onderle=0: karşılaştırma / hata ayıklama
@@ -1125,4 +1469,5 @@ lodHazirla();   // sabitle + SCADA + çevre kurulduktan sonra: birleşmiş parç
 renderer.setAnimationLoop(dongu);
 $('yukleniyor').classList.add('bitti');
 if (!$('ipucu').hidden) document.querySelector('.ip-kart').classList.add('parla');
-window.__fabrika = { makineler, sec, hazir: true, camera, controls, renderer, golgesiz, vr, sabitIst, cevre, lodGuncelle, LOD_KATMAN, onDuvarGuncelle };
+window.__fabrika = { makineler, sec, hazir: true, camera, controls, renderer, golgesiz, vr, sabitIst, cevre, lodGuncelle, LOD_KATMAN, onDuvarGuncelle,
+  gezgin, haritaIst, durusNoktasi, modGec, mod: () => mod, BASLANGIC };

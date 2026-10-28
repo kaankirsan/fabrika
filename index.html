@@ -41,7 +41,7 @@
     </div>
   </div>
   <div class="bosluk"></div>
-  <button id="btn-genel" class="dugme">Genel<span class="uzun"> bakış</span></button>
+  <button id="btn-mod" class="dugme">Kuş bakışı</button>
   <button id="btn-saha" class="dugme" title="Konteyner · FK-1000 · Big bag">B Holü</button>
   <button id="btn-c" class="dugme" title="Ar-Ge &amp; BT: sunucu odası · e-bisiklet · İHA · elektrikli araç">C Holü</button>
   <button id="btn-vr" class="dugme vr" hidden>VR'a gir</button>
@@ -59,45 +59,30 @@
 
 <div id="ipucu" role="note" aria-label="Kontroller">
   <div class="ip-kart">
-    <!-- fare + klavye (masaüstü) -->
-    <div class="ip-fare">
-      <div class="ip-grup">
-        <div class="wasd"><kbd data-t="w">W</kbd><kbd data-t="a">A</kbd><kbd data-t="s">S</kbd><kbd data-t="d">D</kbd></div>
-        <div class="ip-yazi"><b>Yürü</b><span><kbd data-t="shift">Shift</kbd> ile hızlı</span></div>
-      </div>
-      <div class="ip-grup">
-        <svg class="ip-ikon" viewBox="0 0 20 28" aria-hidden="true"><path d="M10 1.5A8.5 8.5 0 0 0 1.5 10v.5H10z" fill="#f2c200"/><rect x="1.5" y="1.5" width="17" height="25" rx="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M1.5 10.5h17M10 1.5v9" stroke="currentColor" stroke-width="1.6"/></svg>
-        <div class="ip-yazi"><b>Sürükle: döndür</b><span>sağ tık kaydır · teker yakınlaş</span></div>
-      </div>
-      <div class="ip-grup">
-        <div class="tuslar"><kbd data-t="q">Q</kbd><kbd data-t="e">E</kbd></div>
-        <div class="ip-yazi"><b>Önceki / sonraki makine</b><span><kbd data-t="escape">Esc</kbd> genel bakış · <kbd data-t="p">P</kbd> panel</span></div>
-      </div>
-      <div class="ip-grup">
-        <svg class="ip-ikon" viewBox="0 0 24 28" aria-hidden="true"><path d="M7 6l13 8.5-5.6 1.3 3.3 6.4-2.6 1.3-3.3-6.4L7 21z" fill="currentColor"/><path d="M3.5 6.5a5 5 0 0 1 5-5M1 9a8 8 0 0 1 4-6.6" fill="none" stroke="#f2c200" stroke-width="1.6" stroke-linecap="round"/></svg>
-        <div class="ip-yazi"><b>Makineye tıkla</b><span>kontrol paneli açılır</span></div>
-      </div>
-    </div>
-    <!-- dokunmatik (telefon / tablet) -->
-    <div class="ip-dokunma">
-      <div class="ip-grup">
-        <svg class="ip-ikon" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="15" r="4.5" fill="#f2c200"/><path d="M5 11a10 10 0 0 1 18 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M23 11l.6-4.2M23 11l-4-1.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <div class="ip-yazi"><b>Tek parmak</b><span>döndür</span></div>
-      </div>
-      <div class="ip-grup">
-        <svg class="ip-ikon" viewBox="0 0 28 28" aria-hidden="true"><circle cx="9.5" cy="18.5" r="4" fill="#f2c200"/><circle cx="18.5" cy="9.5" r="4" fill="#f2c200"/><path d="M5 23l-3 3M23 5l3-3M2 26h4M2 26v-4M26 2h-4M26 2v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <div class="ip-yazi"><b>İki parmak</b><span>yakınlaş · kaydır</span></div>
-      </div>
-      <div class="ip-grup">
-        <svg class="ip-ikon" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="4.5" fill="#f2c200"/><circle cx="14" cy="14" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".8"/><circle cx="14" cy="14" r="12.5" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".4"/></svg>
-        <div class="ip-yazi"><b>Makineye dokun</b><span>kontrol paneli</span></div>
-      </div>
-    </div>
+    <div class="ip-ic" id="ipucu-ic"></div>
     <button class="ip-kapat" id="ipucu-kapat" aria-label="Kontrolleri gizle" title="Gizle">×</button>
   </div>
 </div>
 <button id="ipucu-ac" class="dugme" hidden>⌨ Kontroller</button>
 <div id="tooltip" hidden></div>
+<!-- birinci şahıs: nişangâh (fare kilitliyken), otomatik yürüyüş göstergesi, ışınlanma karartması -->
+<div id="nisan"><span class="n-nokta"></span><span id="nisan-ad" hidden></span></div>
+<div id="yolculuk" hidden><span id="yolculuk-yazi"></span><button id="yolculuk-atla" class="dugme" title="Hedefe hemen geç (Boşluk)">Atla <kbd>Boşluk</kbd></button></div>
+<div id="karartma"></div>
+<div id="karsilama" hidden>
+  <div class="k-kart" role="dialog" aria-label="Sanal fabrikaya hoş geldiniz">
+    <div class="k-ust">SANAL FABRİKA · KAAN KIRŞAN</div>
+    <h1>Fabrikanın girişindesin</h1>
+    <p class="k-fare">Fareyle etrafa bak, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> ile yürü, <kbd>Shift</kbd> ile koş.
+      Bir makineye tıkla: seni oraya yürütür, kontrol paneli açılır.</p>
+    <p class="k-fare k-soluk">İmleç gerektiğinde <kbd>Esc</kbd> — imleçle sürükleyerek de bakabilirsin. Tekrar fareyle bakmak için sahnede boş bir yere tıkla.</p>
+    <p class="k-dokun">Sol altta başparmağınla yürü, ekranı sürükleyerek etrafa bak. Bir makineye dokun: seni oraya yürütür, kontrol paneli açılır.</p>
+    <div class="k-dugmeler">
+      <button id="k-basla" class="dugme ana">▶ Gezmeye başla</button>
+      <button id="k-kus" class="dugme">Kuş bakışıyla aç</button>
+    </div>
+  </div>
+</div>
 <div id="yukleniyor">Fabrika kuruluyor…</div>
 
 <canvas id="sahne"></canvas>

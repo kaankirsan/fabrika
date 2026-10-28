@@ -2,7 +2,9 @@
 //
 // Masaüstündeki sahne aynen kullanılır; VR'da:
 //  - Hareket: SOL çubuk yürür (baş yönüne göre), SAĞ çubuk 30° adımlı döner (mide dostu),
-//    tetik zemine basılırsa oraya ışınlanır.
+//    tetik zemine basılırsa oraya ışınlanır. Masaüstü yürüyüşüyle aynı harita (js/gezgin.js):
+//    duvar ve makinelerden geçilmez (çubukla yürürken duvar boyunca kayar), ışınlanma yürünebilir
+//    en yakın noktaya oturur. Yürüyüşten girilirse aynı yerde, aynı yöne bakarak başlar.
 //  - Seçim: tetikle makineye işaret et → önünde 3B kontrol paneli açılır (masaüstündeki
 //    sağ panelin aynısı: kontroller, canlı değerler, trend). Paneldeki düğmelere tetikle
 //    basılır; "basılı tut" düğmeleri tetik bırakılana dek etkin kalır.
@@ -20,7 +22,8 @@ import * as THREE from 'three';
 const Y = new THREE.Vector3(0, 1, 0);
 const SINIR = { x0: -104, x1: 158, z0: -34, z1: 34 };      // ışınlanma/yürüme alanı (A + B + C holü, x −106…160)
 
-export function vrKur({ renderer, scene, camera, controls, makineler, gunes, etiketler, masaustuSec, gorunumAyarla, buton }) {
+export function vrKur({ renderer, scene, camera, controls, makineler, gunes, etiketler, masaustuSec, gorunumAyarla, buton,
+  gezgin = null, durusNoktasi = null, baslangic = null, bitis = null, basladi = null }) {
   const rig = new THREE.Group();
   rig.name = 'vr-rig';
   scene.add(rig);
@@ -255,6 +258,8 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
   // ------------------------------------------------------------------ ışınlanma / hareket
   // hedefZemin: kullanıcının başının geleceği zemin noktası; bak: bakılacak nokta
   function isinlan(hedefZemin, bak) {
+    const s = gezgin?.enYakin(hedefZemin.x, hedefZemin.z, 8);
+    if (s) hedefZemin = new THREE.Vector3(s.x, 0, s.z);
     camera.getWorldPosition(_h);
     if (bak) {
       camera.getWorldDirection(_d); _d.y = 0; _d.normalize();
@@ -279,6 +284,13 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
   }
   // Makinenin masaüstü kamera açısından (kamera.poz → hedef) ayakta duruş noktası türetilir.
   function makineyeGit(mk) {
+    if (durusNoktasi) {
+      const d = durusNoktasi(mk);
+      isinlan(new THREE.Vector3(d.x, 0, d.z), d.hedef);
+      paneliAc(mk);
+      masaustuSec?.(mk);
+      return;
+    }
     mk.kok.updateMatrixWorld(true);
     const m = mk.m;
     let hedef, poz;
@@ -345,6 +357,7 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
     kayit.pos = camera.position.clone(); kayit.quat = camera.quaternion.clone();
     kayit.golge = gunes.castShadow; kayit.fog = scene.fog; kayit.hedef = controls.target.clone();
     controls.enabled = false;
+    basladi?.();
     camera.clearViewOffset();
     gunes.castShadow = false;
     scene.fog = new THREE.Fog(scene.background, 14, gorusR);
@@ -357,11 +370,18 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
     const dur = t.clone().addScaledVector(yon, 4); dur.y = 0;
     dur.x = THREE.MathUtils.clamp(dur.x, SINIR.x0, SINIR.x1); dur.z = THREE.MathUtils.clamp(dur.z, SINIR.z0, SINIR.z1);
     ilkKare = { dur, bak: new THREE.Vector3(t.x, 0, t.z) };
+    const b = baslangic?.();
+    if (b) {
+      const d0 = new THREE.Vector3(b.x, 0, b.z);
+      ilkKare = { dur: d0, bak: d0.clone().add(new THREE.Vector3(-Math.sin(b.yaw), 0, -Math.cos(b.yaw))) };
+    }
   });
   let ilkKare = null;
   renderer.xr.addEventListener('sessionend', () => {
     aktif = false;
     if (buton) buton.textContent = "VR'a gir";
+    camera.getWorldPosition(_h); camera.getWorldDirection(_d);
+    const cikis = { x: _h.x, z: _h.z, yaw: Math.atan2(-_d.x, -_d.z) };
     rig.remove(camera);
     camera.position.copy(kayit.pos); camera.quaternion.copy(kayit.quat);
     controls.target.copy(kayit.hedef); controls.enabled = true; controls.update();
@@ -371,6 +391,7 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
     P.mesh.visible = false; MN.mesh.visible = false; hedefHalka.visible = false;
     kumandalar.forEach((k) => { k.nokta.visible = false; });
     gorunumAyarla();
+    bitis?.(cikis.x, cikis.z, cikis.yaw);
   });
 
   // ------------------------------------------------------------------ kare
@@ -390,7 +411,13 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
         const m = Math.hypot(ax, ay);
         if (m > 0.15) {
           const s = ((m - 0.15) / 0.85) * 2.6 * dt / m;
-          rig.position.addScaledVector(_d, -ay * s).addScaledVector(_r, ax * s);
+          _v.set(0, 0, 0).addScaledVector(_d, -ay * s).addScaledVector(_r, ax * s);
+          if (gezgin) {
+            camera.getWorldPosition(_h);
+            const [nx, nz] = gezgin.kaydir(_h.x, _h.z, _h.x + _v.x, _h.z + _v.z);
+            _v.set(nx - _h.x, 0, nz - _h.z);
+          }
+          rig.position.add(_v);
           rig.position.x = THREE.MathUtils.clamp(rig.position.x, SINIR.x0 - 5, SINIR.x1 + 5);
           rig.position.z = THREE.MathUtils.clamp(rig.position.z, SINIR.z0 - 5, SINIR.z1 + 5);
         }

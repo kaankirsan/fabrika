@@ -11,6 +11,7 @@
 //       ayakIzi: [genislikX, derinlikZ],  // zemin işareti için (m)
 //       ayakIziMerkez?: [x, z],           // işaret makine orijininden kaymışsa (ör. konteynerin açık dizisi)
 //       kamera?: { poz:[x,y,z], hedef:[x,y,z] },   // makine yerel çerçevesinde
+//       durus?: { poz:[x,z], bak:[x,y,z] }, // yürüyüş / VR'da ayakta durulacak yer + bakış (yerel); yoksa kameradan
 //       mekanizmalar: [metin...],         // hareketli parçalar
 //       cikarim: [metin...],              // fotoğraf/videodan neyi nasıl çıkardım
 //       group,                            // THREE.Group (kök y=0 zemin)

@@ -186,6 +186,7 @@ export function create(lib) {
 
   // ---------------------------------------------------------------- kamyon (açık kasa, kabin +X)
   const kamyon = new THREE.Group();
+  kamyon.userData.gezGecer = true;   // yer değiştirir: yürüme haritasında engel değil (js/gezgin.js)
   g.add(kamyon);
   box(5.0, 0.12, 2.4, M.celik, 0, KASA_Y - 0.06, 0, kamyon);                        // kasa tabanı
   for (const s of [-1, 1]) box(5.0, 0.22, 0.05, M.gri, 0, KASA_Y + 0.11, s * 1.18, kamyon);
@@ -219,6 +220,7 @@ export function create(lib) {
 
   // ---------------------------------------------------------------- forklift (balya besleme)
   const fork = new THREE.Group();
+  fork.userData.gezGecer = true;
   g.add(fork);
   const flSari = mat(0xf2b705, { r: 0.5, m: 0.2, key: 'forklift' });
   box(1.0, 0.55, 1.5, flSari, 0, 0.55, -0.25, fork);                                // gövde
@@ -661,6 +663,7 @@ export function create(lib) {
     ayakIzi: [20, 9.6],
     ayakIziMerkez: [2.1, -0.5],
     kamera: { poz: [5.0, 7.5, 10.5], hedef: [-2.6, 1.2, -1.8] },
+    durus: { poz: [-9.5, -5.5], bak: [-2.6, 1.0, -1.8] },   // yürüyüş: koridordan kıstırma çerçevesine
     mekanizmalar: [
       'Paralel kollar: taşıyıcı kiriş üzerindeki kızakta yatay silindirlerle ortaya kayar, kauçuk pabuçlar balyayı iki yandan sıkıştırır (çanta yanlardan hafif içe basılır)',
       'Taşıyıcı: üst kirişteki dikey hidrolik silindir taşıyıcıyı krom kolonlarda yukarı-aşağı sürer; kollar ve balya onunla kalkar',

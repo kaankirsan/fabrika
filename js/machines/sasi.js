@@ -481,6 +481,7 @@ export function create(lib) {
     proje: 'other-machines',
     ayakIzi: [16, 6.4],
     kamera: { poz: [1.5, 6.6, 12.8], hedef: [0, 1.3, 0] },
+    durus: { poz: [0, 11.5], bak: [0, 1.1, 0] },       // yürüyüş: 13 m şase iki ayağıyla kadraja girsin diye koridordan
     mekanizmalar: [
       'Döner aynalar (2×): şaseyi uçlarından tutar, dişli kutulu motorla 90° adımlarla ya da sürekli döner',
       'Taşıyıcılar: kuledeki dikey kızakta, alttaki hidrolik silindirlerle 1600–2400 mm arasında kalkar/iner',

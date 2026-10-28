@@ -9,23 +9,31 @@ Güncellemek için bu klasörde: `git add -A && git commit -m "..." && git push`
 ## Bilgisayarda
 `FABRIKAYI AC.bat` → tarayıcıda `http://localhost:8090/` açılır.
 
-| Girdi | İş |
-|---|---|
-| Sol tık sürükle | Döndür |
-| Sağ tık sürükle | Kaydır |
-| Teker | Yakınlaş |
-| W A S D (+Shift) | Yürü |
-| Makineye tıkla / soldaki liste | Makineyi seç, sağda kontrol paneli |
-| 1–9 | İlk dokuz makineye git |
-| Q / E | Önceki / sonraki makine |
-| Esc / panelde × | Genel bakış |
-| P / panelde ⟩ | Paneli gizle-göster (kamera makinede kalır) |
-| "B Holü" | Konteyner · FK-1000 · Big bag (A holünün doğusu, geniş geçitten yürünür) |
-| C Holü (B'nin doğusu, koridor ekseninde geçit) | Ar-Ge & BT: sunucu odası, e-bisiklet, İHA, elektrikli araç |
-| "Efektler" | Gölgelendirme (AO) + parlama; kare hızı düşerse kendiliğinden kapanır, `?efekt=0` kapatır |
+Fabrika **girişte, göz hizasında** (birinci şahıs) açılır. Karşılama kartındaki **Gezmeye başla** fareyi
+kilitler (oyun gibi); **Esc** imleci geri verir (liste, panel, düğmeler için), sahnede boş bir yere
+tıklamak tekrar kilitler. Üst şeritteki **Kuş bakışı** (ya da **M**) eski yörünge kamerasına geçer.
 
-Alttaki kontrol kartı × ile küçülür ("⌨ Kontroller" ile geri gelir); basılan tuş kartta yanar.
-Telefonda tek parmak döndürür, iki parmak yakınlaştırır/kaydırır.
+| Girdi | Yürüyüş (birinci şahıs) | Kuş bakışı |
+|---|---|---|
+| Fare | Kilitliyken: etrafa bak · imleç serbestken: sürükle → bak | Sol tık sürükle döndür · sağ tık kaydır · teker yakınlaş |
+| W A S D / oklar (+Shift) | Yürü (Shift koş) · ← → döner | Kaydır |
+| Teker | İleri / geri adım | Yakınlaş |
+| Makineye tıkla / soldaki liste / 1–9 / Q E | Koridorlardan **yürüyerek** gider, varınca panel açılır | Yakın plan + panel |
+| Boşluk / "Atla" | Otomatik yürüyüşü bitir (hedefe geç) | — |
+| Zemine tıkla | (imleç serbestken) fare kilidine dön | Oraya in, yürüyüşe geç |
+| Esc | Kilidi aç → yürüyüşü kes → paneli kapat | Genel bakış |
+| P / panelde ⟩ | Paneli gizle-göster | Paneli gizle-göster |
+| M / "Kuş bakışı" ↔ "Yürü" | Kuş bakışına geç | Baktığın yere (ya da seçili makinenin önüne) in |
+| "B Holü" / "C Holü" | Geçitten içeri yürür | Holün üstüne uçar |
+| "Efektler" | Gölgelendirme (AO) + parlama; kare hızı düşerse kendiliğinden kapanır, `?efekt=0` kapatır | |
+
+Duvarlardan, makinelerden ve raflardan geçilmez (yürünebilir alan haritası: `js/gezgin.js`).
+Alttaki kontrol kartı o anki moda göre değişir; × ile küçülür ("⌨ Kontroller" ile geri gelir), basılan tuş kartta yanar.
+Telefonda: sol altta başparmakla sanal kumanda (yürü, sonuna kadar it: koş), sağda sürükle → bak, makineye
+dokun → oraya yürü, zemine dokun → oraya yürü. Kuş bakışında tek parmak döndürür, iki parmak yakınlaştırır/kaydırır.
+
+URL: `?m=<id>` makineye yürüyerek götürür (portföydeki "Sanal fabrikada gez" düğmeleri), `?mod=kus` kuş bakışıyla
+açar, `?ui=0` arayüzü gizler (ekran görüntüsü için; kuş bakışıyla açılır).
 
 ## Quest (VR)
 1. `FABRIKA VR AC.bat` çalıştır (ilk seferde Windows güvenlik duvarı sorarsa **Özel ağ**'a izin ver).
@@ -36,13 +44,14 @@ Telefonda tek parmak döndürür, iki parmak yakınlaştırır/kaydırır.
 
 | Kumanda | İş |
 |---|---|
-| Sol çubuk | Yürü (baktığın yöne göre) |
+| Sol çubuk | Yürü (baktığın yöne göre; duvar ve makinelerden geçilmez, duvar boyunca kayar) |
 | Sağ çubuk sağa/sola | 30° adımlı dönüş |
-| Tetik → zemin | Oraya ışınlan |
+| Tetik → zemin | Oraya ışınlan (yürünebilir en yakın noktaya) |
 | Tetik → makine | Önünde kontrol paneli açılır |
 | Tetik → panel düğmesi | Bas (basılı tut düğmeleri tetik bırakılana dek etkin) |
 | Yan tuş (grip) | Makine listesi menüsü (seçilen makinenin önüne ışınlar) · salon ortası · B holü · C holü · VR'dan çık |
 
+Masaüstünde yürürken VR'a girilirse aynı yerde, aynı yöne bakarak başlanır; VR'dan çıkınca yürüyüş kalınan yerden sürer.
 VR'da performans için gölgeler kapalı ve uzak makineler sisin arkasında çizilmez;
 kare hızı düşerse görüş mesafesi kendiliğinden kısalır.
 

@@ -1184,6 +1184,7 @@ export function create(lib) {
     ayakIziMerkez: [0, ROOF_Z],
     // Canlı kamera (8, 7, 14) → (0, 1.4, 0), FOV 40; fabrika FOV 45 → mesafe ×0.88
     kamera: { poz: [7.2, 6.3, 12.4], hedef: [0, 1.4, 0] },
+    durus: { poz: [-6, -8.4], bak: [0, 0.5, 1] },      // yürüyüş: çatı alanı korkuluğunun dışından panellere
     mekanizmalar: [
       'Robot: panel üstünde 1.2 m/s gidip gelir; kenar sensörü (±8.1 m) algılayınca yön değiştirir, öndeki LED kümesi turuncu yanar',
       'Gövde altında boydan boya iki siyah kıllı fırça kendi ekseninde döner; altında su püskürtme, arkasında ıslak iz',

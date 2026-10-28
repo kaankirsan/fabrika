@@ -605,6 +605,7 @@ export function create(lib) {
     proje: 'solarbot',
     ayakIzi: [8.4, 5.8],
     kamera: { poz: [-1.6, 4.4, 6.4], hedef: [0.3, 1.25, -0.3] },
+    durus: { poz: [0.4, 7.2], bak: [0.3, 1.5, -0.6] },   // yürüyüş: eğimli masanın tamamı ve robot görünsün diye geride
     mekanizmalar: [
       'Paletler: sol/sağ palet ayrı hızda döner (diferansiyel sürüş, yerinde dönüş)',
       'Ön ve arka fırça kutusu: gövdeye braketle bağlı; içindeki siyah kıllı fırçalar ters yönde döner, ikisi de geçtiği yerdeki tozu 0.74 m genişlikte siler',

@@ -20,6 +20,8 @@
 //       degerler() -> [[etiket, deger]],  // canlı değer tablosu
 //       trend: Trend | null,
 //       durum() -> { metin, seviye: 'calisiyor'|'uyari'|'alarm'|'bekliyor' }
+//       tur?: { bekle?: sn, varis?() }   // VR turu (js/vrtur.js): ön durakta bekleme süresi; tur makineye
+//                                        // gelince çağrılır (ör. konteyner toplama gösterisini başlatır)
 //       sabitHaric?: [Object3D...] | () => [...]   // verilirse main, BUNLAR DIŞINDAKİ
 //                                        // parçaları sabitle() ile birleştirir (performans).
 //                                        // Hareket eden / gizlenip gösterilen / malzemesi

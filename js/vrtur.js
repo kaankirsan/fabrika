@@ -109,7 +109,7 @@ export function turKur({ scene, camera, rig, makineler, gezgin, durusNoktasi, ri
     let px = null, pz = null;
     sira.forEach((x, mi) => {
       const d = durusNoktasi(x);
-      const ds = [{ tur: 'on', ad: 'Ön taraf', x: d.x, z: d.z, bak: d.hedef.clone(), bekle: AYAR.bekle.on }];
+      const ds = [{ tur: 'on', ad: 'Ön taraf', x: d.x, z: d.z, bak: d.hedef.clone(), bekle: x.m.tur?.bekle ?? AYAR.bekle.on }];
       try { const h = hmiDurak(x); if (h) ds.push(h); } catch (e) { console.warn('[tur] hmi', x.m.id, e); }
       try { ds.push(...yanDuraklar(x, ds)); } catch (e) { console.warn('[tur] yan', x.m.id, e); }
       // yürüyerek gezer gibi: önceki noktaya en yakından başla, sonra hep en yakın durak
@@ -202,6 +202,7 @@ export function turKur({ scene, camera, rig, makineler, gezgin, durusNoktasi, ri
     if (mk === mkSimdi) return;
     mkSimdi = mk;
     olay.makineDegisti?.(mk);
+    try { mk.m.tur?.varis?.(); } catch (e) { console.warn('[tur] varis', mk.m.id, e); }   // makine gösterisini başlatsın
     ciz();
   }
   function yolBaslat() {

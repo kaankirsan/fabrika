@@ -746,7 +746,15 @@ export function create(lib) {
     tekerlekler.forEach((w) => lib.sabitle(w.a, []));
   }
 
+  // VR turu gelince (js/vrtur.js): paneller açık ve boştaysa toplama → yükleme gösterisi hemen başlar,
+  // tur ön durakta daha uzun bekler (bütün döngü 3–4 dk; turun burada kaldığı sürede katlanma görünsün)
+  const tur = {
+    bekle: 14,
+    varis() { if (demoDongu && !acil && !otoNeden && !sira.length && sahada() && !panelKapali()) { acikBekle = 0; nakliye(); } },
+  };
+
   return {
+    tur,
     id: 'konteyner',
     ad: 'Güneş Enerjili Konteyner',
     altBaslik: 'Akordeon dizi · hidromotor · Flutter',

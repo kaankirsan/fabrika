@@ -63,7 +63,7 @@ güncellenince uygulama da güncellenir, yeniden kurmak gerekmez.
   fabrika yüklenince `vr.bagla` bağlar; karşılama kartı gösterilmez. Reddedilirse üst şeritteki **VR'a gir** kalır.
 - Uygulamayı siteye bağlayan doğrulama: `kaankirsan.github.io/.well-known/assetlinks.json` (paket
   `io.github.kaankirsan.fabrika` + imza parmak izi). Silinirse uygulama VR'da açılmaz.
-- APK projesi ve imza anahtarı: `..\fabrika-quest-uygulama\` (anahtar orada kalmalı; repoya girmez).
+- APK projesi ve imza anahtarı: `C:\Users\Kaan\Desktop\Projects\fabrika-quest\` (anahtar orada kalmalı; repoya girmez).
 
 ## Notlar
 - `tools/vr-sertifika/` yerel test sertifikasıdır; siteyi internete yayınlarken bu klasörü koymayın

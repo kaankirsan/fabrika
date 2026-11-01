@@ -55,6 +55,16 @@ Masaüstünde yürürken VR'a girilirse aynı yerde, aynı yöne bakarak başlan
 VR'da performans için gölgeler kapalı ve uzak makineler sisin arkasında çizilmez;
 kare hızı düşerse görüş mesafesi kendiliğinden kısalır.
 
+### Quest uygulaması (APK)
+Gözlükte **Uygulamalar → Bilinmeyen kaynaklar → Sanal Fabrika**: ikona basınca doğrudan VR'da, girişte açılır.
+Uygulama canlı siteyi (`/fabrika/?uygulama=1`) açan bir kabuktur (Meta Bubblewrap, TWA): Wi-Fi ister, site
+güncellenince uygulama da güncellenir, yeniden kurmak gerekmez.
+- `?uygulama=1` → `index.html` VR oturumunu açılışta ister (ikon dokunuşu kullanıcı etkileşimi sayılır),
+  fabrika yüklenince `vr.bagla` bağlar; karşılama kartı gösterilmez. Reddedilirse üst şeritteki **VR'a gir** kalır.
+- Uygulamayı siteye bağlayan doğrulama: `kaankirsan.github.io/.well-known/assetlinks.json` (paket
+  `io.github.kaankirsan.fabrika` + imza parmak izi). Silinirse uygulama VR'da açılmaz.
+- APK projesi ve imza anahtarı: `..\fabrika-quest-uygulama\` (anahtar orada kalmalı; repoya girmez).
+
 ## Notlar
 - `tools/vr-sertifika/` yerel test sertifikasıdır; siteyi internete yayınlarken bu klasörü koymayın
   (GitHub Pages zaten HTTPS verir, sertifikaya gerek kalmaz).

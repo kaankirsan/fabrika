@@ -1477,7 +1477,8 @@ if (mod === 'gez') {
     gezSec(ilkX);
   } else {
     gezgin.isinla(BASLANGIC.x, BASLANGIC.z, BASLANGIC.yaw, BASLANGIC.pitch);
-    if (!document.body.classList.contains('arayuzsuz')) $('karsilama').hidden = false;
+    // Quest uygulamasında (?uygulama=1) karşılama kartı yok: doğrudan VR'a girilir
+    if (!document.body.classList.contains('arayuzsuz') && URLP.get('uygulama') !== '1') $('karsilama').hidden = false;
   }
 } else sec(ilkX || null, { anlik: true }); // null → ekran yönüne uygun genel bakış
 arayuzGuncelle();
@@ -1492,3 +1493,6 @@ $('yukleniyor').classList.add('bitti');
 if (!$('ipucu').hidden) document.querySelector('.ip-kart').classList.add('parla');
 window.__fabrika = { makineler, sec, hazir: true, camera, controls, renderer, golgesiz, vr, sabitIst, cevre, lodGuncelle, LOD_KATMAN, onDuvarGuncelle,
   gezgin, haritaIst, durusNoktasi, modGec, mod: () => mod, BASLANGIC };
+// Quest uygulaması: index.html'de açılışta istenen VR oturumu, sahne hazır olunca girişte bağlanır.
+// Reddedildiyse (null) ya da bu arada kapandıysa üst şeritteki "VR'a gir" düğmesi kalır.
+window.__vrErken?.then((s) => s && vr.bagla(s)).catch((e) => console.warn('[vr] açılış oturumu bağlanamadı', e));

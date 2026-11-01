@@ -1,0 +1,17 @@
+{
+  "name": "Sanal Fabrika",
+  "short_name": "Sanal Fabrika",
+  "description": "Kaan Kırşan'ın otomasyon projelerinin gezilebilir 3B / VR fabrikası.",
+  "lang": "tr",
+  "id": "/fabrika/",
+  "start_url": "/fabrika/?uygulama=1",
+  "scope": "/fabrika/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0f1419",
+  "theme_color": "#0f1419",
+  "icons": [
+    { "src": "img/ikon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "img/ikon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

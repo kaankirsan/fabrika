@@ -34,6 +34,11 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
   const _h = new THREE.Vector3(), _d = new THREE.Vector3(), _r = new THREE.Vector3(), _v = new THREE.Vector3();
 
   // ------------------------------------------------------------------ giriş düğmesi
+  // düğme ve Quest uygulamasının açılış oturumu (index.html → window.__vrErken) aynı yoldan bağlanır
+  async function bagla(s) {
+    renderer.xr.setReferenceSpaceType('local-floor');
+    await renderer.xr.setSession(s);
+  }
   if (buton) {
     if (!navigator.xr) {
       buton.hidden = false; buton.disabled = true;
@@ -48,9 +53,7 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
       buton.addEventListener('click', async () => {
         if (aktif) { renderer.xr.getSession()?.end(); return; }
         try {
-          const s = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor'] });
-          renderer.xr.setReferenceSpaceType('local-floor');
-          await renderer.xr.setSession(s);
+          await bagla(await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor'] }));
         } catch (e) { console.error('[vr] oturum açılamadı', e); buton.title = 'VR oturumu açılamadı: ' + e.message; }
       });
     }
@@ -482,5 +485,5 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
     });
   }
 
-  return { rig, aktif: () => aktif, update, makineyeGit, _test: { P, MN, menuKapat, paneliKapat } };
+  return { rig, aktif: () => aktif, update, makineyeGit, bagla, _test: { P, MN, menuKapat, paneliKapat } };
 }

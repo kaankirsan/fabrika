@@ -18,6 +18,17 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Sanal Fabrika: kaynak robotu hücresi, konveyör hattı ve SCADA video duvarı">
 <meta name="twitter:card" content="summary_large_image">
+<!-- Quest uygulaması (PWA/TWA, bkz. NASIL KULLANILIR.md): start_url ?uygulama=1 → açılışta doğrudan VR -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="img/ikon-192.png">
+<script>
+// Quest uygulaması (?uygulama=1): ikona dokunmak VR için kullanıcı etkileşimi sayılır ama hakkı kısa sürer →
+// oturum sayfa açılır açılmaz istenir, fabrika yüklenince js/main.js bağlar (vr.bagla). Parametresiz açılışta hiçbir şey yapmaz.
+if (/[?&]uygulama=1(&|$)/.test(location.search) && navigator.xr) {
+  window.__vrErken = navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor'] })
+    .catch(function (e) { console.warn('[vr] açılışta oturum açılamadı', e); return null; });
+}
+</script>
 <!-- Addon dosyaları 'three' bare specifier'ını import eder -> importmap ŞART.
      three r184: three.module.js aynı klasördeki three.core.js'i göreli import eder. -->
 <script type="importmap">

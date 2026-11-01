@@ -653,6 +653,7 @@ export class Ekran {
     this.tex.anisotropy = kalite.anisotropi;
     this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(wM, hM), new THREE.MeshBasicMaterial({ map: this.tex, toneMapped: false }));
     this.mesh.userData.ayri = true;   // sabitle() birleştirmesin (görünürlük filtresi kök grubu bulmalı)
+    this.mesh.userData.hmi = { w: wM, h: hM };   // VR turu makinenin en büyük ekranına yaklaşır (js/vrtur.js)
   }
   // Performans: makine görüş dışında / uzaktaysa (main.js kök grubuna ekranAktif=false
   // yazar) canvas çizimi ve GPU doku yüklemesi atlanır; yaklaşınca bir sonraki tikte çizilir.

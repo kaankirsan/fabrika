@@ -398,7 +398,8 @@ export function create(lib) {
   let acil = false;
   let sira = [], siraAd = '', siraTur = '';
   let baslangicT = 1.0;
-  let demoDongu = true, demoBekle = 0;
+  let demoDongu = true, demoBekle = 0, acikBekle = 0;
+  const DEMO_ACIK_SURE = 25;                  // demo: paneller açık bu kadar sn kalır, sonra topla → yükle → götür
   let direkAcik = false, direkE = 0;
   let ruzgar = 12, ruzgarLimit = 40, saat = 13, zamanAkisi = false;
   let otoRuzgar = true, otoGunBatimi = true, dolu = false;
@@ -519,7 +520,12 @@ export function create(lib) {
 
     // -- açılış: kurulum senaryosu kendiliğinden oynar
     if (baslangicT > 0) { baslangicT -= dt; if (baslangicT <= 0) kurulum(); }
-    // -- demo döngüsü: nakliye bitince yeni sahaya kurulum
+    // -- demo döngüsü: paneller tam açık ve sahne boşken bir süre üretir, sonra kendiliğinden toplanıp
+    //    kamyona yüklenir; nakliye bitince yeni sahaya yeniden kurulur (kimse komut vermeden döner)
+    if (demoDongu && !acil && !otoNeden && !sira.length && sahada() && !panelKapali() && sVar() && acikOran() > 0.99) {
+      acikBekle += dt;
+      if (acikBekle > DEMO_ACIK_SURE) { acikBekle = 0; nakliye(); }
+    } else acikBekle = 0;
     if (demoBekle > 0) { demoBekle -= dt; if (demoBekle <= 0 && !sira.length && tirda) kurulum(); }
 
     // -- sıra yürütücü
@@ -695,7 +701,7 @@ export function create(lib) {
       { metin: 'Kurulum (kamyonla getir)', tur: 'basla', tik: kurulum },
       { metin: 'Nakliye (topla · yükle · gönder)', tur: 'dur', tik: nakliye },
     ] },
-    { tip: 'anahtar', metin: 'Nakliyeden sonra yeni sahaya kur (demo döngüsü)', get: () => demoDongu, set: (v) => (demoDongu = v) },
+    { tip: 'anahtar', metin: 'Otomatik döngü (kur → aç → topla → yükle → yeniden kur)', get: () => demoDongu, set: (v) => (demoDongu = v) },
     { tip: 'baslik', metin: 'Panel dizisi (hidromotor + zincir)' },
     { tip: 'butonlar', ogeler: [
       { metin: 'Panelleri aç', tur: 'basla', tik: panelAc },

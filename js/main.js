@@ -1269,10 +1269,14 @@ renderer.xr.addEventListener('sessionend', () => { efektKademe(efektVrOnce); efe
 // yüklenince metal yansımaları gerçek bir depo/atölyeyi yansıtır.
 new HDRLoader().load('vendor/env/empty_warehouse_01_1k.hdr', (hdr) => {
   hdr.mapping = THREE.EquirectangularReflectionMapping;
-  const eski = scene.environment;
-  scene.environment = pmrem.fromEquirectangular(hdr).texture;
+  const yeni = pmrem.fromEquirectangular(hdr).texture;
   scene.environmentIntensity = 0.75;   // depo HDRI'si oda ortamından koyu: metal/boya yansıması dengelensin
-  hdr.dispose(); eski?.dispose();
+  hdr.dispose();
+  // VR'dayken sahne ortamı kapalı (yalnız metaller yansıtır, js/vrkalite.js): yenisini o devralır
+  if (vr?.ortamGeldi(yeni)) return;
+  const eski = scene.environment;
+  scene.environment = yeni;
+  eski?.dispose();
 }, undefined, (e) => console.warn('HDRI yüklenemedi, oda ortamı kalıyor', e));
 
 // Ölü kıvılcım / su parçacıkları makinelerde y = −10'a "park" ediliyor; salon kenarının ötesinde
@@ -1323,8 +1327,9 @@ function lodHazirla() {
 }
 function lodGuncelle(vrde) {
   // K: 1 m yarıçaplı parçanın LOD_PIKSEL'e düştüğü mesafe → yarıçapı d / K'dan küçük parçalar gizlenir
+  // VR'da eşik uyarlanır (js/vr.js: çizim çağrısı bütçesine göre 3–8 piksel)
   const H = vrde ? 1900 : renderer.domElement.height;
-  const K = H / (2 * Math.tan(THREE.MathUtils.degToRad(vrde ? 45 : camera.fov / 2)) * LOD_PIKSEL);
+  const K = H / (2 * Math.tan(THREE.MathUtils.degToRad(vrde ? 45 : camera.fov / 2)) * (vrde ? vr.lodPiksel() : LOD_PIKSEL));
   camera.getWorldPosition(_lodP);
   for (const x of makineler) {
     if (!x.lod) continue;
@@ -1338,6 +1343,7 @@ function lodGuncelle(vrde) {
 }
 
 function dongu(zaman) {
+  const kareT0 = performance.now();   // VR uyarlanır kalitesi: karenin CPU süresi (js/vr.js cpuOlc)
   saat.update(zaman);
   const dtHam = saat.getDelta();
   const dt = Math.min(dtHam, 0.05);   // makine simülasyonu adımı
@@ -1394,6 +1400,7 @@ function dongu(zaman) {
     });
   }
   ciz(dt);
+  if (vrde) vr.cpuOlc(performance.now() - kareT0);
 }
 
 await makineleriYukle();

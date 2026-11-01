@@ -1,26 +1,35 @@
 // js/vr.js — Quest (WebXR) desteği.
 //
 // Masaüstündeki sahne aynen kullanılır; VR'da:
-//  - Hareket: SOL çubuk yürür (baş yönüne göre), SAĞ çubuk 30° adımlı döner (mide dostu),
-//    tetik zemine basılırsa oraya ışınlanır. Masaüstü yürüyüşüyle aynı harita (js/gezgin.js):
-//    duvar ve makinelerden geçilmez (çubukla yürürken duvar boyunca kayar), ışınlanma yürünebilir
-//    en yakın noktaya oturur. Yürüyüşten girilirse aynı yerde, aynı yöne bakarak başlar.
-//  - Seçim: tetikle makineye işaret et → önünde 3B kontrol paneli açılır (masaüstündeki
+//  - Otomatik tur (js/vrtur.js): VR'a girince 3 sn sonra başlar, makineleri durak durak gezdirir
+//    (ön, HMI ekranı, iki yan), sonda başa sarar. SOL tetik başlat / durdur. Yanda hep duran tur
+//    panelinden makine seçilir (karartarak geçer, tur oradan sürer); YAN TUŞ paneli gizler/gösterir.
+//  - Tur dururken serbest: SOL çubuk yürür (baş yönüne göre), SAĞ çubuk 30° adımlı döner, SAĞ tetik
+//    zemine basılırsa oraya ışınlanır. Masaüstü yürüyüşüyle aynı harita (js/gezgin.js): duvar ve
+//    makinelerden geçilmez. Yürüyüşten girilirse aynı yerde, aynı yöne bakarak başlar.
+//  - Seçim: SAĞ tetikle makineye işaret et → önünde 3B kontrol paneli açılır (masaüstündeki
 //    sağ panelin aynısı: kontroller, canlı değerler, trend). Paneldeki düğmelere tetikle
 //    basılır; "basılı tut" düğmeleri tetik bırakılana dek etkin kalır.
-//  - Menü: herhangi bir kumandada YAN TUŞ (grip) → makine listesi; seçilen makinenin
-//    önüne ışınlanır. Menüde salon ortası / B holü / C holü / VR'dan çıkış da var.
-//  - Performans (Quest): gölge kapalı, sis yakın, uzaktaki makineler çizilmez
-//    (sisin arkasında kalır), ekran dokuları yalnız yakındaki makinelerde güncellenir.
-//    Hedef kare hızının altına düşülürse görüş mesafesi kendiliğinden kısalır.
+//  - Görüntü / performans (js/vrkalite.js): bütün fabrika görünür. Uzaktaki makineler tek parçalık
+//    vekilleriyle, yakındakiler ve turun gezdiği canlı çizilir; 72 Hz. Kare hızına göre önce
+//    foveation (kenar keskinliği), sonra canlı yarıçap ve ayrıntı eşiği kendiliğinden ayarlanır.
 //
 // Panellerdeki kontrol tanımları makine modüllerindeki `kontroller` dizisidir
 // (lib.js başındaki sözleşme) — yeni makine eklemek VR için ek iş gerektirmez.
 
 import * as THREE from 'three';
+import { turKur } from './vrtur.js';
+import { vrKaliteKur } from './vrkalite.js';
 
 const Y = new THREE.Vector3(0, 1, 0);
 const SINIR = { x0: -104, x1: 158, z0: -34, z1: 34 };      // ışınlanma/yürüme alanı (A + B + C holü, x −106…160)
+const HZ = 72;                                              // Quest'te hedef yenileme hızı
+// VR havası: uzak hol ucu karanlığa değil hafif bir pusa karışır (eskiden sis = arka plan rengi, 34 m)
+const SIS = { renk: 0x56616d, yakin: 70, uzak: 300 };
+// uyarlanır kalite sınırları
+const FOV = { min: 0.15, max: 1, ilk: 0.45 };               // sabit foveation: 0 keskin kenar, 1 en ucuz
+const CANLI = { min: 6, max: 11 };                          // canlı (tam ayrıntı, hareketli) makine yarıçapı, m
+const LOD_PX = { min: 3, max: 8 };                          // VR'da bundan küçük görünen parça çizilmez (piksel)
 
 export function vrKur({ renderer, scene, camera, controls, makineler, gunes, etiketler, masaustuSec, gorunumAyarla, buton,
   gezgin = null, durusNoktasi = null, baslangic = null, bitis = null, basladi = null }) {
@@ -32,12 +41,32 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
   let secili = null;
   const kayit = {};                                   // masaüstü ayarlarını VR çıkışında geri yükle
   const _h = new THREE.Vector3(), _d = new THREE.Vector3(), _r = new THREE.Vector3(), _v = new THREE.Vector3();
+  const kalite = vrKaliteKur({ renderer, scene, camera, makineler });
+  let fov = FOV.ilk, canliR = 9, lodPx = 4;
 
   // ------------------------------------------------------------------ giriş düğmesi
-  // düğme ve Quest uygulamasının açılış oturumu (index.html → window.__vrErken) aynı yoldan bağlanır
+  // düğme ve Quest uygulamasının açılış oturumu (index.html → window.__vrErken) aynı yoldan bağlanır.
+  // Vekiller, VR malzeme ayarı ve gölgelendirici derlemesi oturum bağlanmadan yapılır (gözlükte
+  // yükleniyor noktaları görünürken): VR içinde takılma olmaz.
   async function bagla(s) {
+    kalite.hazirla();
     renderer.xr.setReferenceSpaceType('local-floor');
-    await renderer.xr.setSession(s);
+    renderer.xr.setFoveation(fov);
+    // Quest Browser'da EXT_multisampled_render_to_texture yok: three'nin projeksiyon katmanı yolu MSAA'yı
+    // ayrı bir çözümleme geçişiyle yapıyor (ölçüldü: ~3 fps kayıp). Klasik XRWebGLLayer'da MSAA'yı
+    // tarayıcı kendisi veriyor → setSession sürerken three'ye katman desteği yokmuş gibi görün.
+    const B = window.XRWebGLBinding?.prototype;
+    const katman = B && Object.prototype.hasOwnProperty.call(B, 'createProjectionLayer')
+      && !renderer.getContext().getExtension('EXT_multisampled_render_to_texture') ? B.createProjectionLayer : null;
+    if (katman) delete B.createProjectionLayer;
+    try {
+      await renderer.xr.setSession(s);
+    } catch (e) {
+      kalite.birak();
+      throw e;
+    } finally {
+      if (katman) B.createProjectionLayer = katman;
+    }
   }
   if (buton) {
     if (!navigator.xr) {
@@ -59,7 +88,6 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
     }
   }
   renderer.xr.enabled = true;
-  renderer.xr.setFoveation(1.0);
 
   // ------------------------------------------------------------------ kumandalar
   const isinGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]);
@@ -80,7 +108,7 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
     c.addEventListener('disconnected', () => { k.gp = null; });
     c.addEventListener('selectstart', () => tetikBas(k));
     c.addEventListener('selectend', () => tetikBirak(k));
-    c.addEventListener('squeezestart', () => menuAcKapa(k));
+    c.addEventListener('squeezestart', () => tur.panelAcKapa());
     return k;
   });
 
@@ -101,7 +129,6 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
     return { cv, ctx: cv.getContext('2d'), tex, mesh, W: px, H, bolgeler: [], hover: null };
   }
   const P = panelYap(0.72, 1.12, 900);          // makine paneli
-  const MN = panelYap(0.9, 0.82, 1000);         // menü
 
   const R = (x, px, py, w, h, r) => { x.beginPath(); x.roundRect(px, py, w, h, r); };
   function dugme(p, x, px, py, w, h, metin, tur, eylem, secili2 = false) {
@@ -220,30 +247,6 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
     tr.seriler.forEach((s) => { x.fillStyle = s.renk; x.fillRect(lx, py + 14, 14, 5); x.fillStyle = '#c9d3dc'; x.fillText(s.ad, lx + 20, py + 22); lx += x.measureText(s.ad).width + 44; });
   }
 
-  function menuCiz() {
-    const p = MN, x = p.ctx, W = p.W, H = p.H;
-    p.bolgeler = [];
-    x.clearRect(0, 0, W, H);
-    R(x, 2, 2, W - 4, H - 4, 28); x.fillStyle = 'rgba(14,19,26,0.95)'; x.fill();
-    x.lineWidth = 3; x.strokeStyle = '#2b3540'; x.stroke();
-    x.fillStyle = '#f2c200'; x.font = '700 34px "Space Grotesk", sans-serif'; x.textAlign = 'left'; x.textBaseline = 'alphabetic';
-    x.fillText('SANAL FABRİKA · makineye git', 34, 58);
-    // makine sayısı artınca satırlar sığsın diye düğme yüksekliği uyarlanır (alt sıra + kenar payı)
-    const kol = 2, bw = (W - 68 - 14) / kol, satir = Math.ceil(makineler.length / kol);
-    const bh = Math.min(52, Math.floor((H - 84 - 10 - 58 - 26) / satir) - 8);
-    makineler.forEach((mk, i) => {
-      const c = i % kol, r = Math.floor(i / kol);
-      dugme(p, x, 34 + c * (bw + 14), 84 + r * (bh + 8), bw, bh, `${String(mk.no).padStart(2, '0')}  ${mk.m.ad}`, '', () => { menuKapat(); makineyeGit(mk); }, mk === secili);
-    });
-    const y = 84 + Math.ceil(makineler.length / kol) * (bh + 8) + 10;
-    const ucw = (W - 68 - 42) / 4;
-    dugme(p, x, 34, y, ucw, 58, 'Salon ortası', '', () => { menuKapat(); isinlan(new THREE.Vector3(-30, 0, 0), new THREE.Vector3(-30, 0, -10)); });
-    dugme(p, x, 34 + ucw + 14, y, ucw, 58, 'B Holü', '', () => { menuKapat(); isinlan(new THREE.Vector3(62, 0, 1), new THREE.Vector3(82, 0, -8)); });
-    dugme(p, x, 34 + 2 * (ucw + 14), y, ucw, 58, 'C Holü', '', () => { menuKapat(); isinlan(new THREE.Vector3(126, 0, 1), new THREE.Vector3(150, 0, 0)); });
-    dugme(p, x, 34 + 3 * (ucw + 14), y, ucw, 58, "VR'dan çık", 'dur', () => renderer.xr.getSession()?.end());
-    p.tex.needsUpdate = true;
-  }
-
   // Panel, kullanıcının önüne (hafif sola) yerleşir ve ona döner; dünyada sabit kalır.
   function paneliYerlestir(p, sagaAci = 0.35, uzak = 1.05, dusey = -0.12) {
     camera.getWorldPosition(_h); camera.getWorldDirection(_d); _d.y = 0; _d.normalize();
@@ -255,8 +258,17 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
   }
   function paneliAc(mk) { secili = mk; makinePaneliCiz(); paneliYerlestir(P); }
   function paneliKapat() { secili = null; P.mesh.visible = false; }
-  function menuAcKapa() { if (MN.mesh.visible) menuKapat(); else { menuCiz(); paneliYerlestir(MN, 0, 1.0, -0.05); } }
-  function menuKapat() { MN.mesh.visible = false; }
+
+  // ------------------------------------------------------------------ otomatik tur (js/vrtur.js)
+  const tur = turKur({
+    scene, camera, rig, makineler, gezgin, durusNoktasi, rigDondur, isinlan, panelYap, dugme, R,
+    olay: {
+      // tur yeni makineye geçince: eski makinenin paneli kapanır, masaüstü seçimi eşitlenir (LOD tam ayrıntı)
+      makineDegisti: (mk) => { if (secili && secili !== mk) paneliKapat(); masaustuSec?.(mk); gorunurlukGuncelle(); },
+      detay: (mk) => { if (mk) paneliAc(mk); },
+      cikis: () => renderer.xr.getSession()?.end(),
+    },
+  });
 
   // ------------------------------------------------------------------ ışınlanma / hareket
   // hedefZemin: kullanıcının başının geleceği zemin noktası; bak: bakılacak nokta
@@ -285,33 +297,8 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
     rig.rotation.y += aci;
     rig.updateMatrixWorld(true);
   }
-  // Makinenin masaüstü kamera açısından (kamera.poz → hedef) ayakta duruş noktası türetilir.
-  function makineyeGit(mk) {
-    if (durusNoktasi) {
-      const d = durusNoktasi(mk);
-      isinlan(new THREE.Vector3(d.x, 0, d.z), d.hedef);
-      paneliAc(mk);
-      masaustuSec?.(mk);
-      return;
-    }
-    mk.kok.updateMatrixWorld(true);
-    const m = mk.m;
-    let hedef, poz;
-    if (m.kamera) {
-      hedef = mk.kok.localToWorld(new THREE.Vector3().fromArray(m.kamera.hedef));
-      poz = mk.kok.localToWorld(new THREE.Vector3().fromArray(m.kamera.poz));
-    } else {
-      const b = new THREE.Box3().setFromObject(m.group); hedef = b.getCenter(new THREE.Vector3());
-      poz = hedef.clone().add(new THREE.Vector3(0, 0, 5).applyQuaternion(mk.kok.quaternion));
-    }
-    const yon = poz.clone().sub(hedef); yon.y = 0;
-    const L = THREE.MathUtils.clamp(yon.length() * 0.6, 2.2, 5.5);
-    yon.normalize();
-    const dur = hedef.clone().addScaledVector(yon, L); dur.y = 0;
-    isinlan(dur, hedef);
-    paneliAc(mk);
-    masaustuSec?.(mk);
-  }
+  // Makineye git: turun o makinedeki ilk durağına karartarak geçilir, tur oradan sürer.
+  function makineyeGit(mk) { tur.atlaMk(mk); }
 
   // ------------------------------------------------------------------ tetik
   const ray = new THREE.Raycaster();
@@ -325,27 +312,34 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
     return { hit, b };
   }
   function isinKur(k) { ray.setFromXRController(k.c); }
+  const solMu = (k) => k.el === 'left';
+  function paneller() { return [tur.panel, P]; }
+  function panelYenile(p) { if (p === P) makinePaneliCiz(); else tur.ciz(); }
   function tetikBas(k) {
+    // SOL tetik yalnız turu başlatır / durdurur (ışını yok, panel / ışınlanma yapmaz)
+    if (solMu(k)) { tur.basDur(); return; }
     isinKur(k);
-    for (const p of [MN, P]) {
+    for (const p of paneller()) {
       const v = panelVurus(k, p);
       if (v) {
         const e = v.b?.eylem;
         if (typeof e === 'function') e();
         else if (e && e.bas) { e.bas(); k.tutulan = e; }
-        if (p === P) makinePaneliCiz(); else if (MN.mesh.visible) menuCiz();
+        if (p.mesh.visible) panelYenile(p);
         return;
       }
     }
-    // makine seçimi (yalnız tetikte — her karede tüm sahneyi taramıyoruz)
-    const gorunen = makineler.filter((x) => x.kok.visible).map((x) => x.kok);
+    // makine seçimi (yalnız tetikte — her karede tüm sahneyi taramıyoruz); uzaktaki makinenin vekili de seçilir
+    const gorunen = makineler.filter((x) => x.kok.visible).map((x) => x.kok).concat(kalite.vekilNesneleri());
     const hit = ray.intersectObjects(gorunen, true)[0];
     const zHit = ray.ray.intersectPlane(zemin, _v);
     if (hit && (!zHit || hit.distance <= ray.ray.origin.distanceTo(_v) + 0.01)) {
-      let o = hit.object; while (o && !o.userData.makine) o = o.parent;
-      const mk = o && makineler.find((x) => x.kok === o);
+      let mk = null;
+      if (hit.object.isBatchedMesh) mk = hit.object.userData.vekilIcin?.[hit.batchId] || null;
+      else { let o = hit.object; while (o && !o.userData.makine) o = o.parent; mk = o && makineler.find((x) => x.kok === o); }
       if (mk) { paneliAc(mk); masaustuSec?.(mk); return; }
     }
+    if (tur.yuruyor()) return;   // tur sürerken ışınlanma yok (rig'i tur taşıyor)
     if (zHit && zHit.x > SINIR.x0 && zHit.x < SINIR.x1 && zHit.z > SINIR.z0 && zHit.z < SINIR.z1 && ray.ray.origin.distanceTo(zHit) < 30) {
       isinlan(zHit.clone(), null);
     }
@@ -353,7 +347,7 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
   function tetikBirak(k) { if (k.tutulan) { k.tutulan.birak(); k.tutulan = null; } }
 
   // ------------------------------------------------------------------ oturum
-  let gorusR = 34, kareOrt = 1 / 72;
+  let kareOrt = 1 / HZ, cpuOrt = 0.008;
   renderer.xr.addEventListener('sessionstart', () => {
     aktif = true;
     if (buton) buton.textContent = "VR'dan çık";
@@ -363,7 +357,12 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
     basladi?.();
     camera.clearViewOffset();
     gunes.castShadow = false;
-    scene.fog = new THREE.Fog(scene.background, 14, gorusR);
+    // aynı Fog türü (gölgelendirici yeniden derlenmez); renk arka plan değil pus: uzak hol ucu kararmaz
+    scene.fog = new THREE.Fog(SIS.renk, SIS.yakin, SIS.uzak);
+    kareOrt = 1 / HZ; cpuOrt = 0.008; canliR = 9; lodPx = 4;
+    // 72 Hz (Quest 2 varsayılanı 90; bu sahnede 90 tutmuyor, 72 kararlı + daha az takılma)
+    const ss = renderer.xr.getSession();
+    if (ss?.updateTargetFrameRate && ss.supportedFrameRates?.includes?.(HZ)) ss.updateTargetFrameRate(HZ).catch(() => {});
     rig.position.set(0, 0, 0); rig.rotation.set(0, 0, 0);
     rig.add(camera); camera.position.set(0, 0, 0); camera.quaternion.identity();
     // başlangıç: masaüstündeki bakış noktasının önüne
@@ -378,10 +377,13 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
       const d0 = new THREE.Vector3(b.x, 0, b.z);
       ilkKare = { dur: d0, bak: d0.clone().add(new THREE.Vector3(-Math.sin(b.yaw), 0, -Math.cos(b.yaw))) };
     }
+    turBasla = true;   // ilk karede (konum oturunca) tur geri sayımı başlar
   });
-  let ilkKare = null;
+  let ilkKare = null, turBasla = false;
   renderer.xr.addEventListener('sessionend', () => {
     aktif = false;
+    tur.bitir();
+    kalite.birak();
     if (buton) buton.textContent = "VR'a gir";
     camera.getWorldPosition(_h); camera.getWorldDirection(_d);
     const cikis = { x: _h.x, z: _h.z, yaw: Math.atan2(-_d.x, -_d.z) };
@@ -389,26 +391,28 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
     camera.position.copy(kayit.pos); camera.quaternion.copy(kayit.quat);
     controls.target.copy(kayit.hedef); controls.enabled = true; controls.update();
     gunes.castShadow = kayit.golge; scene.fog = kayit.fog;
-    makineler.forEach((x) => { x.kok.visible = true; x.kok.userData.ekranAktif = true; });
+    makineler.forEach((x) => { x.kok.visible = true; x.kok.userData.ekranAktif = true; x._canli = false; });
+    turOnceki = turSon = null;
     etiketler.forEach((e) => { e.visible = true; });
-    P.mesh.visible = false; MN.mesh.visible = false; hedefHalka.visible = false;
+    P.mesh.visible = false; hedefHalka.visible = false; secili = null;
     kumandalar.forEach((k) => { k.nokta.visible = false; });
     gorunumAyarla();
     bitis?.(cikis.x, cikis.z, cikis.yaw);
   });
 
   // ------------------------------------------------------------------ kare
-  let cullT = 0, panelT = 0;
+  let cullT = 0, panelT = 0, ayarT = 0;
   function update(dt, t) {
     if (!aktif) return;
     if (ilkKare) { isinlan(ilkKare.dur, ilkKare.bak); ilkKare = null; }
+    if (turBasla) { turBasla = false; tur.basla(); gorunurlukGuncelle(); }
     kareOrt += (dt - kareOrt) * 0.05;
 
-    // çubuklar: sol yürür, sağ adımlı döner
+    // çubuklar (yalnız tur dururken: tur sürerken rig'i tur taşır): sol yürür, sağ adımlı döner
     camera.getWorldDirection(_d); _d.y = 0; _d.normalize();
     _r.crossVectors(_d, Y).normalize();
     for (const k of kumandalar) {
-      const gp = k.gp; if (!gp || gp.axes.length < 4) continue;
+      const gp = k.gp; if (!gp || gp.axes.length < 4 || tur.yuruyor()) continue;
       const ax = gp.axes[2], ay = gp.axes[3];
       if (k.el === 'left') {
         const m = Math.hypot(ax, ay);
@@ -430,19 +434,22 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
       }
     }
 
-    // ışın: panel üzerinde vurgulama + zemin hedef halkası
+    // tur: rig'i taşır / döndürür, paneli yanında tutar
+    tur.update(dt);
+
+    // ışın (yalnız SAĞ kumanda; sol tetik başlat/durdur): panel üzerinde vurgulama + zemin hedef halkası
     hedefHalka.visible = false;
     for (const k of kumandalar) {
-      if (!k.gp) { k.isin.visible = false; continue; }
+      if (!k.gp || solMu(k)) { k.isin.visible = false; k.nokta.visible = false; continue; }
       k.isin.visible = true;
       isinKur(k);
       let L = 6, vurdu = false;
-      for (const p of [MN, P]) {
+      for (const p of paneller()) {
         const v = panelVurus(k, p);
         if (v) {
           L = v.hit.distance; vurdu = true;
           if ((v.b?.px ?? -1) !== (p.hover?.px ?? -2) || (v.b?.py ?? -1) !== (p.hover?.py ?? -2)) {
-            p.hover = v.b; if (p === P) makinePaneliCiz(); else menuCiz();
+            p.hover = v.b; panelYenile(p);
           }
           k.nokta.position.copy(v.hit.point); k.nokta.visible = true;
           break;
@@ -450,10 +457,11 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
       }
       if (!vurdu) {
         k.nokta.visible = false;
+        for (const p of paneller()) if (p.hover) { p.hover = null; panelYenile(p); }
         const z = ray.ray.intersectPlane(zemin, _v);
         if (z && ray.ray.origin.distanceTo(z) < 30) {
           L = ray.ray.origin.distanceTo(z);
-          if (k.el === 'right' || !hedefHalka.visible) { hedefHalka.position.set(z.x, 0.02, z.z); hedefHalka.visible = true; }
+          if (!tur.yuruyor()) { hedefHalka.position.set(z.x, 0.02, z.z); hedefHalka.visible = true; }
         }
       }
       k.isin.scale.z = L;
@@ -463,27 +471,53 @@ export function vrKur({ renderer, scene, camera, controls, makineler, gunes, eti
     panelT += dt;
     if (panelT > 0.2) { panelT = 0; if (P.mesh.visible) makinePaneliCiz(); }
 
-    // performans: uzaktaki makineleri sisin arkasında gizle; kare hızı düşerse görüş kısalır
+    // canlı / vekil seçimi: 4 Hz
     cullT += dt;
-    if (cullT > 0.25) {
-      cullT = 0;
-      if (kareOrt > 1 / 60 && gorusR > 20) gorusR -= 1;
-      else if (kareOrt < 1 / 70 && gorusR < 34) gorusR += 0.5;
-      scene.fog.far = gorusR; scene.fog.near = gorusR * 0.42;
-      gorunurlukGuncelle();
+    if (cullT > 0.25) { cullT = 0; gorunurlukGuncelle(); }
+
+    // uyarlanır kalite (1 Hz). GPU'ya mı CPU'ya mı takıldığımızı karenin CPU süresi söyler (main.js cpuOlc):
+    //  - kare yavaş ama CPU payı küçük → GPU: foveation artar (kenarlar biraz yumuşar)
+    //  - kare yavaş ve CPU payı büyük → çizim çağrısı: canlı yarıçap ve ayrıntı eşiği daralır
+    //  - kare hızı rahat → önce keskinlik (foveation azalır), sonra ayrıntı geri gelir
+    ayarT += dt;
+    if (ayarT > 1) {
+      ayarT = 0;
+      const butce = 1 / HZ, yavas = kareOrt > butce * 1.1, rahat = kareOrt < butce * 1.03;
+      if (yavas && cpuOrt < butce * 0.8) fov = Math.min(FOV.max, fov + 0.1);
+      else if (yavas) { canliR = Math.max(CANLI.min, canliR - 1); lodPx = Math.min(LOD_PX.max, lodPx + 1); }
+      else if (rahat && fov > FOV.min) fov = Math.max(FOV.min, fov - 0.05);
+      else if (rahat) { canliR = Math.min(CANLI.max, canliR + 0.5); lodPx = Math.max(LOD_PX.min, lodPx - 0.5); }
+      renderer.xr.setFoveation(fov);
     }
   }
+  // Canlı (hareketli, tam ayrıntı): turun gezdiği makine, bir önceki (uzaklaşana dek: vekile geçişteki
+  // poz sıçraması uzakta olsun), paneli açık olan; tur dururken ayrıca canliR içindekiler. Diğerleri
+  // vekiliyle (donmuş anlık görüntü, toplu çizim). Simülasyon hepsinde sürer.
+  // Ölçüm (Quest 2): komşu makineyi de canlı tutmak kaynak robotunda tek başına ~320 çağrı ekliyordu.
+  let turOnceki = null, turSon = null;
   function gorunurlukGuncelle() {
     if (!aktif) return;
     camera.getWorldPosition(_h);
+    const turMk = tur.makine(), turda = tur.yuruyor();
+    if (turMk !== turSon) { turOnceki = turSon; turSon = turMk; }
     makineler.forEach((x, i) => {
       const s = x.kure; const dist = s ? _h.distanceTo(s.center) - s.radius : 0;
-      const gor = dist < gorusR || x === secili;
-      x.kok.visible = gor;
-      x.kok.userData.ekranAktif = gor && dist < 14;
-      if (etiketler[i]) etiketler[i].visible = gor && dist > 4;
+      const yakin = dist < (x._canli ? canliR + 3 : canliR);
+      const canli = !x.vekil || x === secili || x === turMk || (x === turOnceki && dist < 6) || (!turda && yakin);
+      x._canli = canli;
+      x.kok.visible = canli;
+      kalite.vekilGoster(x, !canli);
+      x.kok.userData.ekranAktif = canli && dist < 14;
+      // etiket: 4–40 m (uzaktakiler hem kalabalık hem çizim çağrısı)
+      if (etiketler[i]) etiketler[i].visible = dist > 4 && dist < 40;
     });
   }
 
-  return { rig, aktif: () => aktif, update, makineyeGit, bagla, _test: { P, MN, menuKapat, paneliKapat } };
+  return {
+    rig, aktif: () => aktif, update, makineyeGit, bagla,
+    lodPiksel: () => lodPx,
+    cpuOlc(ms) { cpuOrt += (ms / 1000 - cpuOrt) * 0.05; },
+    ortamGeldi: (tex) => kalite.ortamGeldi(tex),
+    _test: { P, tur, kalite, paneliKapat, durum: () => ({ fov, canliR, lodPx, kareOrt, cpuOrt }) },
+  };
 }

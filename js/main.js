@@ -1503,3 +1503,14 @@ window.__fabrika = { makineler, sec, hazir: true, camera, controls, renderer, go
 // Quest uygulaması: index.html'de açılışta istenen VR oturumu, sahne hazır olunca girişte bağlanır.
 // Reddedildiyse (null) ya da bu arada kapandıysa üst şeritteki "VR'a gir" düğmesi kalır.
 window.__vrErken?.then((s) => s && vr.bagla(s)).catch((e) => console.warn('[vr] açılış oturumu bağlanamadı', e));
+// Quest uygulaması: fabrikanın kullandığı bütün dosyalar çevrimdışı önbelleğe (sw.js) → internetsiz açılır
+if (URLP.get('uygulama') === '1' && navigator.serviceWorker) {
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    if (e.data?.tip === 'onbellek-hazir') console.info('[sw] çevrimdışı önbellek hazır', e.data);
+  });
+  navigator.serviceWorker.ready.then((reg) => {
+    const urls = [location.href, ...performance.getEntriesByType('resource').map((r) => r.name)];
+    reg.active?.postMessage({ tip: 'onbellege-al', urls });
+    navigator.storage?.persist?.().catch(() => {});   // tarayıcı yer açarken silmesin
+  }).catch(() => {});
+}

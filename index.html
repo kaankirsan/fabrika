@@ -28,6 +28,10 @@ if (/[?&]uygulama=1(&|$)/.test(location.search) && navigator.xr) {
   window.__vrErken = navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor'] })
     .catch(function (e) { console.warn('[vr] açılışta oturum açılamadı', e); return null; });
 }
+// Quest uygulaması internetsiz de açılsın: çevrimdışı önbellek (sw.js; dosya listesini main.js gönderir)
+if (/[?&]uygulama=1(&|$)/.test(location.search) && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(function (e) { console.warn('[sw] kaydolmadı', e); });
+}
 </script>
 <!-- Addon dosyaları 'three' bare specifier'ını import eder -> importmap ŞART.
      three r184: three.module.js aynı klasördeki three.core.js'i göreli import eder. -->

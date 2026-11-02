@@ -65,8 +65,11 @@ Masaüstünde yürürken VR'a girilirse aynı yerden başlanır; VR'dan çıkın
 
 ### Quest uygulaması (APK)
 Gözlükte **Uygulamalar → Bilinmeyen kaynaklar → Sanal Fabrika**: ikona basınca doğrudan VR'da, girişte açılır.
-Uygulama canlı siteyi (`/fabrika/?uygulama=1`) açan bir kabuktur (Meta Bubblewrap, TWA): Wi-Fi ister, site
-güncellenince uygulama da güncellenir, yeniden kurmak gerekmez.
+Uygulama canlı siteyi (`/fabrika/?uygulama=1`) açan bir kabuktur (Meta Bubblewrap, TWA); site güncellenince
+uygulama da güncellenir, yeniden kurmak gerekmez.
+- **İnternetsiz çalışır:** uygulamada `sw.js` (service worker) kaydolur; fabrikanın kullandığı bütün dosyalar
+  (~5.5 MB) gözlüğe kaydedilir. İnternetli **ilk** açılıştan sonra Wi-Fi olmadan da açılır. İnternet varken her
+  zaman en güncel sürüm gelir (önce ağ, 4 sn içinde yanıt yoksa önbellek). Normal site ziyaretçilerinde kaydolmaz.
 - `?uygulama=1` → `index.html` VR oturumunu açılışta ister (ikon dokunuşu kullanıcı etkileşimi sayılır),
   fabrika yüklenince `vr.bagla` bağlar; karşılama kartı gösterilmez. Reddedilirse üst şeritteki **VR'a gir** kalır.
 - Uygulamayı siteye bağlayan doğrulama: `kaankirsan.github.io/.well-known/assetlinks.json` (paket

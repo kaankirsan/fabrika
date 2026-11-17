@@ -490,8 +490,8 @@ export function create(lib) {
       'Dikişler: her travers × yan kiriş için üst, alt ve dış yan dikiş — alttakiler ancak şase döndürülünce yapılabilir',
     ],
     cikarim: [
-      'KAAN\'IN TARİFİ: şasenin uçları kulelere bağlanır, şase kendi ekseni etrafında yavaşça döndürülür, operatörler etrafta kaynak yapar.',
-      'other-machines-img-01: iki gri kule (biri "P5"), kızaklı taşıyıcıda dişli kutusu + yuvarlak flanş, altta silindirler, mavi hidrolik ünite (tank, motor, valf, yağ göstergesi), tepe lambalı beyaz pano → modeldeki parçalar.',
+      'Çalışma şekli: şasenin uçları kulelere bağlanır, şase kendi ekseni etrafında yavaşça döndürülür, operatörler etrafta kaynak yapar.',
+      'Saha fotoğrafından: iki gri kule (biri "P5"), kızaklı taşıyıcıda dişli kutusu + yuvarlak flanş, altta silindirler, mavi hidrolik ünite (tank, motor, valf, yağ göstergesi), tepe lambalı beyaz pano → modeldeki parçalar.',
       'TAHMİN: şase ~12 × 2.9 m ve kabataslak profil düzeni; 90° adımlı otomatik çevrim; dönüş hızı (varsayılan 1.5 dev/dk, gösterim için hızlı); eksen yüksekliği aralığı.',
       'TAHMİN: kaynakçılar tavan kaynağı yapmaz ve 2.45 m üstüne uzanmaz — alt yüz dikişleri bu yüzden ancak 90°/180°\'de yapılır; döndürme sırasında fren kilidi.',
     ],

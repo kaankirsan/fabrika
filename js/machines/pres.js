@@ -403,10 +403,10 @@ export function create(lib) {
     cikarim: [
       'Videodaki uzun taç kirişi ve altındaki krom çubuk sırası → çok silindirli (2 × 6) üst koç kabul edildi; silindir sayısı TAHMİN.',
       'Yan kolonlar, alttaki koyu tabla ve hortum/kablo demetleri video karelerinden; ölçüler (~5 m boy, 1.3 m derinlik) oranlama ile TAHMİN.',
-      'Taç üstündeki kırmızı ışıklı beyaz kutu (ilk kare) → buat + durum lambası.',
+      'Taç üstündeki kırmızı ışıklı beyaz kutu → buat + durum lambası.',
       '4 bölge ve ±%1 hedef portföy açıklamasından; bölge sayısı TAHMİN.',
       'TAHMİN: operatör iş akışı (levhayı masadan alıp istif paletine koyma, ham levha beslemesi pres tarafından) ve istif paletinin yeri; videoda operatör görünmüyor.',
-      'Enerji karşılaştırması temsili bir ısıl modelden (eleman + tabla, iki kütle) hesaplanır; bu model ~%9–10 fark veriyor. Portföydeki %20 sahadaki ölçüm — teyit edilmeli. Sayaçta zaman ×30 sıkıştırılmıştır.',
+      'Enerji karşılaştırması temsili bir ısıl modelden (eleman + tabla, iki kütle) hesaplanır; bu model ~%9–10 fark veriyor. Portföydeki %20 sahada ölçülen değerdir. Sayaçta zaman ×30 sıkıştırılmıştır.',
     ],
     group: g,
     // performans: bunlar dışındaki sabit parçalar birleştirilir (lib.sabitle)

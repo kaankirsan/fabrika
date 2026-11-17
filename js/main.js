@@ -713,6 +713,14 @@ function paneliKur(x) {
   kapat.onclick = () => sec(null);
   el('div', 'p-kisa', m.kisa || '');
   const durumEl = el('span', 'durum', '');
+  // portföydeki proje sayfası (kaankirsan.github.io/#/p/<proje>); portföyün "Sanal fabrikada gez" bağlantılarının tersi
+  if (m.proje) {
+    const a = el('a', 'p-proje', 'Portföyde projeyi incele ↗');
+    a.href = `https://kaankirsan.github.io/#/p/${m.proje}`;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.onclick = () => olaySay('portfoy/' + m.proje, `Portföy: ${m.ad}`);
+  }
 
   if (m.kontroller?.length) {
     const b = el('div', 'p-bolum');
@@ -738,7 +746,7 @@ function paneliKur(x) {
     const cb = el('div', 'p-bolum');
     const det = el('details', 'cikarim', '', cb);
     det.open = true;
-    el('summary', '', 'Fotoğraf / videodan çıkarımlar', det);
+    el('summary', '', 'Modelleme notları', det);
     el('ul', 'liste-m', m.cikarim.map((s) => `<li>${s}</li>`).join(''), det);
   }
   $('panel').hidden = panelGizli;

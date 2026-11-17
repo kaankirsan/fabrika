@@ -1,4 +1,4 @@
-// js/machines/vagon.js — Vagon Test Presi (boji yük / süspansiyon testi).
+// js/machines/vagon.js — Boji Test Sistemi (boji yük / süspansiyon testi).
 //
 // Fotoğraftan (wagon-testing-img-01): kısa bir ray hattının üstünde mavi portal —
 // iki kutu ayak (hafifletme pencereli) + üst kiriş. Üstte hidrolik güç ünitesi,
@@ -665,7 +665,7 @@ export function create(lib) {
 
   return {
     id: 'vagon',
-    ad: 'Vagon Test Presi',
+    ad: 'Boji Test Sistemi',
     altBaslik: 'Boji yük testi · yük hücresi · 50+ senaryo',
     kisa: 'Tren vagonu bojisi için hidrolik portal test presi: boji ray üstünde portalın altına girer, koç orta traversteki merkez pivota basar, yaylar çöker; yük hücresi ve cetvelle kuvvet–çökme ölçülür, otomatik test senaryoları ve sonuç değerlendirmesi.',
     proje: 'wagon-testing',
@@ -682,9 +682,9 @@ export function create(lib) {
       'Operatör: testi konsoldan yönetir, boji içeri/dışarı alınırken ve vinç taşırken güvenli çizgiye çekilir, test bitince bojideki sonuç etiketini kontrol eder',
     ],
     cikarim: [
-      'KAAN\'IN DÜZELTMESİ: test edilen parça 4 tekerlekli boji; boji makinenin altına girer, koç orta traverse (merkez pivot) basar, yaylar çöker ve çökme ölçülür.',
-      'Mavi portal, kutu ayaklardaki pencereler ve üstteki ünite wagon-testing-img-01\'den; HMI ekranları (tren-vagon-img-01/02): "Hedef Konum mm / Hedef Ağırlık Ton", basınç ibresi, cetvel kalibrasyonu.',
-      'Video-02: "Pompa 1 / Pompa 2 bar" ve "Koç Aşağı İniyor" → iki pompa (yük + hızlı yaklaşma) ve mesaj çubuğu.',
+      'Çalışma şekli: test edilen parça 4 tekerlekli boji; boji makinenin altına girer, koç orta traverse (merkez pivot) basar, yaylar çöker ve çökme ölçülür.',
+      'Mavi portal, kutu ayaklardaki pencereler ve üstteki ünite saha fotoğrafından; HMI ekranları: "Hedef Konum mm / Hedef Ağırlık Ton", basınç ibresi, cetvel kalibrasyonu.',
+      'Saha videosundan: "Pompa 1 / Pompa 2 bar" ve "Koç Aşağı İniyor" → iki pompa (yük + hızlı yaklaşma) ve mesaj çubuğu.',
       'TAHMİN: yay grubu rijitliği ~0.75 ton/mm (40 ton → ~53 mm), elastik sınır 55 ton, kalıcı çökme ≤ 0.5 mm ve rijitlik ±%12 → GEÇTİ.',
       'TAHMİN: operatör iş akışı (konsol, güvenli bekleme çizgisi, etiket kontrolü); videoda operatörün konumu net görünmüyor.',
       'TAHMİN: boji ölçüleri (dingil aralığı 1.8 m, Ø840 tekerlek, 2×4 helis yay), bojinin vinç halatıyla çekilmesi ve tavan vinciyle 2 boji döngüsü; senaryolar "50+ test senaryosu" ifadesinden örneklendi.',

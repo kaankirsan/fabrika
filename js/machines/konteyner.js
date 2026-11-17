@@ -773,8 +773,8 @@ export function create(lib) {
       'Saha operatörü: tablet kioskunda uygulamayı kullanır; kamyon yanaşırken / ayrılırken yol kenarından kollarıyla yol gösterir, kamyon alttayken "dur" işareti verir; paneller açılırken dizinin yanından izler',
     ],
     cikarim: [
-      'SENİN TARİFİN: tek yan açılır; 15–20 yaprak üçgenler yapa yapa açılıp katlanır; altta dönen hidromotor yaprakların alt uçlarını zincirle çekerek açar/kapatır; kamyon senaryosu (yüksel → kamyon girer → dorseye otur → git; tersiyle kurulum).',
-      'container-img-01/02 + video-01: açık uzun yan, içeride dik paket; alt menteşelerde sarı tekerlekler, zincirli siyah raylar ve ayarlı ayaklar; dıştaki yapraklar yatık, içtekiler dik üçgen → dıştan içe sıralı açılma.',
+      'Çalışma şekli: tek yan açılır; 15–20 yaprak üçgenler yapa yapa açılıp katlanır; altta dönen hidromotor yaprakların alt uçlarını zincirle çekerek açar/kapatır; kamyon senaryosu (yüksel → kamyon girer → dorseye otur → git; tersiyle kurulum).',
+      'Saha fotoğrafları ve videosundan: açık uzun yan, içeride dik paket; alt menteşelerde sarı tekerlekler, zincirli siyah raylar ve ayarlı ayaklar; dıştaki yapraklar yatık, içtekiler dik üçgen → dıştan içe sıralı açılma.',
       'Uçlardaki siyah çerçeve dikmeleri ve altlarındaki krom miller → 4 hidrolik ayak; dikmeler gövdenin dışında olduğu için dorse aralarından geçebilir.',
       'TAHMİN: yaprak sayısı 16 (8 üçgen), yaprak boyu 2.15 m, tam açık eğim 22°, ray sayısı 2, hidromotorun yeri (açık yanın alt kenarı), kaldırma yüksekliği 1.58 m, dorse yatağı 1.32 m, panel gücü 64 × 550 W.',
       'TAHMİN: saha rayları kurulum yerinde serili kabul edildi (konteynerle taşınmıyor). Süreler hızlandırıldı.',

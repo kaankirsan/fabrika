@@ -893,7 +893,7 @@ export function create(lib) {
       'Operatör: kaynaklı bazayı alıp palete koyar, stoktan profil alıp fikstüre dizer, HAZIR\'a basar',
     ],
     cikarim: [
-      'SENİN TARİFİN: iki pozisyoner arkalı önlü, robot önde (sabit kaide), pozisyoner yalnız doğrusal; 3 konumda durup kaynak; robot tek pozisyonerde çalışır, diğeri hazırsa bekler; bitince başlangıca dönüp operatöre gelir.',
+      'Çalışma şekli: iki pozisyoner arkalı önlü, robot önde (sabit kaide), pozisyoner yalnız doğrusal; 3 konumda durup kaynak; robot tek pozisyonerde çalışır, diğeri hazırsa bekler; bitince başlangıca dönüp operatöre gelir.',
       'Kilit mantığı: pozisyoner yalnız robot evdeyken hareket eder; P2\'ye geçiş için P1\'in kaynak bölgesinden çıkmış olması gerekir (ön fikstür arka fikstürün önünü kapatır).',
       'HMI fotoğrafı (Çift Tabla / AUTO, 2500→0 cetvel, ortalama kaynak/yükleme, adet) korundu; T1 = ön, T2 = arka; K1/K2/K3 işaretleri ve sıra/robot kutusu eklendi.',
       'TAHMİN: baza ölçüsü (2.0 × 1.5 m), profil/eklem yerleşimi, konum değerleri (1100/1800/2500), hat arası mesafe, palet ve stok yeri, ışık perdesi + çit.',

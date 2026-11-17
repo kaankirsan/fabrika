@@ -787,9 +787,9 @@ export function create(lib) {
       'Vinç operatörü: telsiz kumandayla perdenin dışındaki güvenli şeritte yükü izleyerek yürür; perde kesildiğinde sol eli ön perdeye uzanır',
     ],
     cikarim: [
-      'KAAN\'IN TARİFİ: iş parçası motor bloğu; vinç yukarıdan bloğu fikstüre koyar → blok devrilir → vinç devrilmiş bloğu alır → fikstür eski haline döner → yeni blok konur. Amaç bloğu CNC\'ye yerleştirirken döndürmek.',
-      'img-05 / img-04: L biçimli beyaz beşik, arka menteşe, V-çeneler, ortada pnömatik silindir → beşik + tahrik korundu; buton kutusu (img-03) aynen.',
-      'KAAN\'IN DÜZELTMESİ: yalnız bir yan tel çitle kapalı (arka yan alındı), diğer üç yan ışık perdesi. TAHMİN: köşe aynalı tek perde. Vinç yukarıdan girdiği için perde kesilmez.',
+      'Çalışma şekli: iş parçası motor bloğu; vinç yukarıdan bloğu fikstüre koyar → blok devrilir → vinç devrilmiş bloğu alır → fikstür eski haline döner → yeni blok konur. Amaç bloğu CNC\'ye yerleştirirken döndürmek.',
+      'Fotoğraflardan: L biçimli beyaz beşik, arka menteşe, V-çeneler, ortada pnömatik silindir → beşik + tahrik korundu; buton kutusu fotoğraftaki gibi.',
+      'Koruma: yalnız bir yan tel çitle kapalı (modelde arka yan), diğer üç yan ışık perdesi. TAHMİN: köşe aynalı tek perde. Vinç yukarıdan girdiği için perde kesilmez.',
       'TAHMİN: vinç tipi kolonlu pergel (jib) vinç + elektrikli zincirli palanga; tavan vinci de olabilir. Blok ölçüsü ~0.65 × 0.42 × 0.40 m (4 silindirli, kabataslak).',
       'TAHMİN: CNC genel bir dikey işleme merkezi (VMC); kayar kapı çatıya uzanır ki vinç tablaya yukarıdan inebilsin. Ham/işlenmiş blok paletleri ve forkliftle yenilenme varsayım. Süreler hızlandırıldı.',
       'TAHMİN: vinci makinenin önündeki operatör telsiz (sarkıt) kumandayla sürer ve yükü yürüyerek izler; perde kesme senaryosundaki el bu operatörün kolu.',

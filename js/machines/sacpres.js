@@ -381,8 +381,7 @@ export function create(lib) {
       'Kumanda kutusu lambaları ve kule lambası duruma göre yanar; ana silindir üstünde iki manometre',
     ],
     cikarim: [
-      'KAAN\'IN TARİFİ: MKN-V07 kalıpla sac şekillendirme presi.',
-      'MKN-V07 kareleri: yeşil H gövde, turuncu üst tabla, büyük silindir, üstte iki manometre ve bükülü borular, sağ dikmede çok butonlu beyaz kumanda kutusu; yanda kabartmalı galvaniz panel; operatör şeffaf poşetlerle çalışıyor → parça poşetlenip istifleniyor.',
+      'Makinenin videosundan: yeşil H gövde, turuncu üst tabla, büyük silindir, üstte iki manometre ve bükülü borular, sağ dikmede çok butonlu beyaz kumanda kutusu; yanda kabartmalı galvaniz panel; operatör şeffaf poşetlerle çalışıyor → parça poşetlenip istifleniyor.',
       'TAHMİN: pres ölçüsü (~2.3 × 4.1 m), kalıp şekli (dikdörtgen kabartma + iki nervür), çift el konsolu (videoda kumanda kutusu görünüyor, konsol yeri tahmin), stok/poşet masası/palet yerleri, operatör akışı.',
       'TAHMİN: basınç ve süre değerleri temsili; çevrim hızlandırıldı.',
     ],

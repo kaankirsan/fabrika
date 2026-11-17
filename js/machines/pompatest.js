@@ -1049,7 +1049,7 @@ export function create(lib) {
       'Kiosk: canlı Pompa Test Sistemi uygulaması (son test, pompa kartları, son raporlar) + Delta HMI manuel ekranı',
     ],
     cikarim: [
-      'KAAN\'IN TARİFİ: iki DC pompa (yakıt + yağ) aynı anda test edilir; her pompanın sıcaklığı, hat basıncı, debisi ve titreşimi ölçülür; operatörler sürekli pompa koyar, pompalar OK / NOK paletlerine dizilir, testler kiosk panodan izlenir.',
+      'Çalışma şekli: iki DC pompa (yakıt + yağ) aynı anda test edilir; her pompanın sıcaklığı, hat basıncı, debisi ve titreşimi ölçülür; operatörler sürekli pompa koyar, pompalar OK / NOK paletlerine dizilir, testler kiosk panodan izlenir.',
       'Fotoğraflardan: turkuaz kabin, 3 kapılı alt dolap, polikarbon kayar kapılı test bölmesi, sarı-siyah ikaz çerçevesi + "DİKKAT! KAYAR KAPI", sarı fikstür, manometreli manifoldlar, numaralı rakorlar (13, 15, 29, 30, 31), mavi konnektörler, yan pnömatik silindirler; sol yanda 220 V pano (iki sıcaklık göstergesi, ana şalter, acil stop) ve iki volan; ayrı kiosk (monitör + Delta HMI + klavye/fare) ve arkada yüksek basınç hava kabini.',
       'Kiosk ve Delta HMI fotoğraftaki düzende yeniden çizildi: menü, son test kodu, bugün tamamlanan, PLC 192.168.7.88 Modbus TCP, yakıt/yağ pompası kartları (debi, DC gerilim/akım, basınç), son raporlar; Manuel ekranda DC limit 100 / 90 V, üst/ön kapak, tank durumları.',
       'TAHMİN: kabul sınırları (debi ≥ %85 nominal, sıcaklık ≤ 70 °C, titreşim ≤ 4.5 mm/s), nominal değerler (yakıt ~8 L/dk · 4.2 bar, yağ ~14 L/dk · 6 bar), uygulanan gerilim oranı (73 V / 77 V), rastgele NOK oranı ~%6.',

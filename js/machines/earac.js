@@ -679,7 +679,7 @@ export function create(lib) {
       'KILL SWITCH: HV kesilir, araç makaralarda serbest yavaşlar (sağ yanda dışarıdan erişilen acil durdurma)',
     ],
     cikarim: [
-      'Kaan\'dan: MAVERA takımı, TÜBİTAK Efficiency Challenge, 4 teker.',
+      'Takım: MAVERA, TÜBİTAK Efficiency Challenge; 4 tekerli araç.',
       'Gövde takımın araç fotoğrafından: astar gri kabuk, ortadan mavi şerit, siyah çerçeveli ön cam, oval yan camlar, makas kapı, çamurluk üstü aynalar, mandallı ön servis kapağı, ön tamponda üçer led çizgi, arka kanat, camda bayrak çıkartması.',
       'Ölçüler fotoğraftan tahmin: ≈2.7 m boy, ≈1.3 m en, ≈1.05 m yükseklik, 1.75 m dingil mesafesi. Fotoğraftaki sponsor logoları konmadı; kapakta takım adı var.',
       'Kapak altındaki yerleşim, motorun yeri ve sayısal değerler temsili: 150 kg (sürücü dahil), Crr 0.0055, CdA ≈ 0.30 m² → 30 km/h\'de ≈ 190 W; pil 16S LiFePO4 51.2 V 20 Ah. Pil tüketimi gösterim için ×10 hızlandırıldı.',

@@ -446,7 +446,6 @@ export function create(lib) {
       'Operatör: şaftı girişten alır, yerleştirir, çeker, baş/şaftı OK ya da NOK kasasına koyar',
     ],
     cikarim: [
-      'KAAN\'IN TARİFİ (MKN-V04 + V05): arabaların şaftlarının başlarını sökmeye yarayan makine.',
       'Videodan: mavi gövde + mavi tel, sarı çift el istasyonu (ortada acil stop, yanlarda yeşil), kanallı uçlu krom mafsal başı siyah çatalda, şaft aşağıda; HMI "SET DEĞERLER: Max Peak, Min Peak, Çek, Kilitle", "Prosesi Durdur".',
       'TAHMİN: çekme yönü (şaft aşağı, baş çatalda kalır), segman bırakma kuvveti ~10 kN, varsayılan Min 6 / Max 14 kN, emniyet sınırı Max + 4 kN, %12 segmansız (düşük kuvvet) parça.',
       'TAHMİN: giriş kasası, baş/şaft OK kasaları ve NOK kasası düzeni; hidrolik ünite yeri.',

@@ -673,9 +673,9 @@ export function create(lib) {
       'Güvenlik: basınç oturmadan kaldırma yok, yük havadayken kollar açılmaz, kol alçakken kamyon durur, ACİL STOP\'ta hidrolik durur ve yük tutulur',
     ],
     cikarim: [
-      'KAAN\'IN DÜZELTMESİ: aparat iş makinesine (ekskavatöre) bağlı DEĞİL — kendi ayakları üzerinde yerde duran bağımsız makine; ortaya doğru kayan iki kol balyayı sarıp tutuyor ve kaldırıyor. Kollar paralel kayıyor, balyanın durduğu yuvarlak plaka döner tabla, kamyon kaldırılmış balyanın altına geri geri yanaşıyor.',
-      'MKN-V01: yerde öne uzanan turuncu ayaklar (yuvarlak uç kapaklı), koyu döner tabla üstünde balya, krom kılavuz kolonlar ve sarı-siyah ikaz şeritli turuncu kollar → ayaklar, tabla, kolonlar ve L biçimli kollar.',
-      'MKN-V03: gri portal çerçeve, ortadaki dikey silindir gri taşıyıcı kirişi yukarı-aşağı sürüyor; mavi hidrolik ünite, lambalı gri kumanda kutusu + anten, turuncu telsiz → taşıyıcı, güç ünitesi, kumanda kutusu.',
+      'Gerçek makinede aparat iş makinesine (ekskavatöre) bağlı DEĞİL — kendi ayakları üzerinde yerde duran bağımsız makine; ortaya doğru kayan iki kol balyayı sarıp tutuyor ve kaldırıyor. Kollar paralel kayıyor, balyanın durduğu yuvarlak plaka döner tabla, kamyon kaldırılmış balyanın altına geri geri yanaşıyor.',
+      'Saha videosundan: yerde öne uzanan turuncu ayaklar (yuvarlak uç kapaklı), koyu döner tabla üstünde balya, krom kılavuz kolonlar ve sarı-siyah ikaz şeritli turuncu kollar → ayaklar, tabla, kolonlar ve L biçimli kollar.',
+      'İkinci saha videosundan: gri portal çerçeve, ortadaki dikey silindir gri taşıyıcı kirişi yukarı-aşağı sürüyor; mavi hidrolik ünite, lambalı gri kumanda kutusu + anten, turuncu telsiz → taşıyıcı, güç ünitesi, kumanda kutusu.',
       'TAHMİN: portal genişliği (kolonlar arası 3.2 m) kamyon kasasının ayakların ve kolonların arasından geçebileceği şekilde alındı; videoda çerçeve daha dar görünüyor — gerçekte kamyon yalnız kasa arkasını sokuyor olabilir.',
       'TAHMİN: forkliftle besleme, kamyonun 4 balya alması, balya ~1 t / 1.0 × 1.15 m, kıskaç basıncı ~110 bar, kaldırma 1.85 m; süreler hızlandırıldı.',
       'Sanal fabrikada gösterim için B holüne alındı: kamyon holün arka duvarındaki RAMPA 2 kapısından geri geri girer, yüklenince aynı kapıdan çıkar.',

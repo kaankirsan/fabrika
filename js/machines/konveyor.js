@@ -814,11 +814,11 @@ export function create(lib) {
       'Operatörler: paletten kola ürün koyar (3 kişi), çıkışta kutuyu palete dizer; paletler bitince yenilenir',
     ],
     cikarim: [
-      'KAAN\'IN TARİFİ: akış kollardan ana hatta (benim ilk modelim tersti); hat sonunda karton sarma/kutulama makinesi; kol sensörü ürünü görür, ana hatta ürün varsa beslemez; makine paketlerken yeni ürün almaz; ham ürün de, kutular da paletlerde.',
-      'warehouse-img-02/03: gri rulolar, rulo aralarından çıkan yeşil kayışlar ve dik çıkan kayışlı kollar → pop-up kayışlı transfer + 4 şeritli besleme kolu.',
-      'warehouse-video-01: uzun yassı mobilya panelleri elle hatta konuyor → ham ürün ~1.8 × 0.9 m, kutu ~1.86 × 0.96 × 0.11 m (TAHMİN).',
-      'TAHMİN: ana hat 20 m (Kaan), kol aralığı 5 m, kol boyu 2.2 m (2 ürün sığar), birleşme önceliği (aşağı akışta uzun bekleyen kol öne geçer), birleşme fotoselinin konumu.',
-      'TAHMİN: kutulama makinesinin iç düzeni (çatı magazini + vakum kafası, wrap-around katlama sırası, bant kafası), çevrim süresi 8 s, palet 10 kat. Süreler gösterim için hızlandırılmış olabilir.',
+      'Çalışma şekli: akış kollardan ana hatta; hat sonunda karton sarma/kutulama makinesi; kol sensörü ürünü görür, ana hatta ürün varsa beslemez; makine paketlerken yeni ürün almaz; ham ürün de, kutular da paletlerde.',
+      'Saha fotoğraflarından: gri rulolar, rulo aralarından çıkan yeşil kayışlar ve dik çıkan kayışlı kollar → pop-up kayışlı transfer + 4 şeritli besleme kolu.',
+      'Saha videosundan: uzun yassı mobilya panelleri elle hatta konuyor → ham ürün ~1.8 × 0.9 m, kutu ~1.86 × 0.96 × 0.11 m (TAHMİN).',
+      'Ana hat 20 m (gerçek ölçü). TAHMİN: kol aralığı 5 m, kol boyu 2.2 m (2 ürün sığar), birleşme önceliği (aşağı akışta uzun bekleyen kol öne geçer), birleşme fotoselinin konumu.',
+      'TAHMİN: kutulama makinesinin iç düzeni (çatı magazini + vakum kafası, wrap-around katlama sırası, bant kafası), çevrim süresi 8 s, palet 10 kat. Süreler temsilidir.',
     ],
     group: g,
     // performans: bunlar dışındaki sabit parçalar birleştirilir (lib.sabitle)

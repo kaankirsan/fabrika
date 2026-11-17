@@ -554,8 +554,8 @@ export function create(lib) {
       'Operatör: taşlama sırasında HMI\'ya bakar; parça değişiminde taşlanmış parçayı tabladan alıp rafa koyar, ham parçayı tablaya yerleştirir (makine onu bekler)',
     ],
     cikarim: [
-      'MKN-V09: kırmızı-krem gövde, manyetik tabla, kırmızı koruyuculu taş kafası, el çarkları ve "STOP" plakası → klasik yüzey taşlama.',
-      'MKN-F08 (DOPSoft "TaşlamaHMI"): Otomatik, Manyetik, Taşlama, Su, Hidrolik Pompa, Çevrim, Yağ, Hata Lambası, Finish/Dalma Tur Sayısı, Dalma Oranı → HMI ve çevrim mantığı bu ekrandan kuruldu.',
+      'Makinenin videosundan: kırmızı-krem gövde, manyetik tabla, kırmızı koruyuculu taş kafası, el çarkları ve "STOP" plakası → klasik yüzey taşlama.',
+      'HMI ekranından (DOPSoft "TaşlamaHMI"): Otomatik, Manyetik, Taşlama, Su, Hidrolik Pompa, Çevrim, Yağ, Hata Lambası, Finish/Dalma Tur Sayısı, Dalma Oranı → HMI ve çevrim mantığı bu ekrandan kuruldu.',
       'TAHMİN: makinenin ölçüleri, retrofit panosunun yeri, dalma/finish sırası (önce dalma turları, sonra dalmasız finish turları) ve kilit: manyetik kapalıyken taşlama durur.',
       'TAHMİN: talaş görseli 60 kat abartıldı; tur süreleri gösterim için gerçek tabla hızıyla ama kısa strokla.',
       'TAHMİN: ham / taşlanmış parça rafı makinenin solunda; parça değişimini operatör elle yapar ve "parça değişimi" adımı operatör parçayı koyana kadar sürer.',

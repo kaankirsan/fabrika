@@ -911,9 +911,9 @@ export function create(lib) {
       'Operatör: magazin azalınca ham parça kasasını alıp basamağa çıkar ve huniye boşaltır; OK kasası dolunca paletten boş kasa getirip değiştirir; arada HMI\'yı izler',
     ],
     cikarim: [
-      'KAAN\'IN TARİFİ: içeride 2 diş açma ünitesi; parça yukarıdan yer çekimiyle gelir, pnömatikler 1. konumda tutar, 1. diş açılır, bırakılır; 2. konuma düşer, 2. diş açılır; sonuç OK ise OK\'ye, değilse NOK\'a — ayırma pnömatik kaydırakla.',
-      'ARKOZ (arkozmakine.com "AR810 · canlı simülasyon"): ünite görünüşü (kutu gövde, 3 delikli gömme kapak, nervürlü motor sütunu + disk kapak, mavi konnektör) ve hareket profili (bekle → hızlı yaklaşma → yavaş ilerleme ~4 tur → geri çıkış, turuncu temas parlaması); devir/tork/çevrim sayacı HMI\'ya taşındı. Geri çıkışta dönüş, girişteki tur sayısıyla eşitlendi (fiziksel olarak doğrusu).',
-      'MKN-F06 / MKN-V10: kutu profil masa, Delta HMI\'lı pano + acil stop, X6/X20 valf adası ve mavi hortumlar, gümüş hava tankı, kırmızı ışıklı sensör.',
+      'Çalışma şekli: içeride 2 diş açma ünitesi; parça yukarıdan yer çekimiyle gelir, pnömatikler 1. konumda tutar, 1. diş açılır, bırakılır; 2. konuma düşer, 2. diş açılır; sonuç OK ise OK\'ye, değilse NOK\'a — ayırma pnömatik kaydırakla.',
+      'ARKOZ (arkozmakine.com "AR810 · canlı simülasyon"): ünite görünüşü (kutu gövde, 3 delikli gömme kapak, nervürlü motor sütunu + disk kapak, mavi konnektör) ve hareket profili (bekle → hızlı yaklaşma → yavaş ilerleme ~4 tur → geri çıkış, turuncu temas parlaması); devir/tork/çevrim sayacı HMI\'ya taşındı. Geri çıkıştaki dönüş sayısı girişteki tur sayısına eşit.',
+      'Makinenin fotoğraf ve videosundan: kutu profil masa, Delta HMI\'lı pano + acil stop, X6/X20 valf adası ve mavi hortumlar, gümüş hava tankı, kırmızı ışıklı sensör.',
       'TAHMİN: oluk eğimi (40°), ünitelerin oluğa dik yerleşimi, yan sıkma, kaydırağın yana kayan plaka olması, M4 ovalama tork bandı (2.4–4.2 N·m), ~3.4 s/parça ritim. Parça okunur olsun diye 3× büyütüldü; kayma görsel olarak yavaşlatıldı.',
       'TAHMİN: magazin üstten basamakla elle doldurulur (huniye kasa boşaltma); OK kasası 40 parçada değiştirilir, dolu kasalar sağdaki palete konur; ham parça kasası solda yerde.',
     ],

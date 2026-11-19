@@ -1035,7 +1035,7 @@ export function create(lib) {
     ad: 'Pompa Test Makinesi',
     altBaslik: '2 DC pompa · Modbus TCP · kiosk',
     kisa: 'Yakıt ve yağ pompasını (DC) aynı anda test eden kabin: sıcaklık, hat basıncı, debi ve titreşim ölçülür, sonuç OK / NOK. Operatör pompaları bağlar, test bitince OK / NOK paletine dizer; testler kiosk panodaki uygulamadan izlenir.',
-    proje: 'other-machines',
+    proje: 'pompa-test',   // portföyde ayrı sayfası var (kaankirsan.github.io/#/p/pompa-test)
     ayakIzi: [8.0, 4.9],
     ayakIziMerkez: [-0.2, -0.45],
     kamera: { poz: [-3.4, 3.3, 5.4], hedef: [-0.4, 1.1, -0.8] },
